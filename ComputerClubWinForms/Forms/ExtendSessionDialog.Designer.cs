@@ -1,78 +1,84 @@
-#nullable enable
-
-namespace ComputerClubWinForms.Forms;
-
-partial class ExtendSessionDialog
+namespace ComputerClubWinForms.Forms
 {
-    private Label _lblMinutes = null!;
-    private NumericUpDown _numMinutes = null!;
-    private Button _btnOk = null!;
-    private Button _btnCancel = null!;
-
-    private void InitializeComponent()
+    partial class ExtendSessionDialog
     {
-        _lblMinutes = new Label();
-        _numMinutes = new NumericUpDown();
-        _btnOk = new Button();
-        _btnCancel = new Button();
-        ((System.ComponentModel.ISupportInitialize)_numMinutes).BeginInit();
-        SuspendLayout();
+        private System.ComponentModel.IContainer? components = null;
+        private System.Windows.Forms.Label lblMinutes = null!;
+        private System.Windows.Forms.NumericUpDown numMinutes = null!;
+        private System.Windows.Forms.Button btnOk = null!;
+        private System.Windows.Forms.Button btnCancel = null!;
+        private System.Windows.Forms.Label lblMessage = null!;
 
-        _lblMinutes.AutoSize = true;
-        _lblMinutes.Location = new Point(24, 28);
-        _lblMinutes.Name = "_lblMinutes";
-        _lblMinutes.Size = new Size(141, 15);
-        _lblMinutes.TabIndex = 0;
-        _lblMinutes.Text = "Добавить минут к сеансу";
-
-        _numMinutes.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        _numMinutes.Location = new Point(190, 24);
-        _numMinutes.Maximum = new decimal(new int[] { 1440, 0, 0, 0 });
-        _numMinutes.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-        _numMinutes.Name = "_numMinutes";
-        _numMinutes.Size = new Size(148, 23);
-        _numMinutes.TabIndex = 1;
-        _numMinutes.Value = new decimal(new int[] { 30, 0, 0, 0 });
-
-        _btnOk.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        _btnOk.DialogResult = DialogResult.OK;
-        _btnOk.Location = new Point(118, 93);
-        _btnOk.Name = "_btnOk";
-        _btnOk.Size = new Size(106, 27);
-        _btnOk.TabIndex = 2;
-        _btnOk.Text = "Продлить";
-        _btnOk.UseVisualStyleBackColor = true;
-
-        _btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        _btnCancel.DialogResult = DialogResult.Cancel;
-        _btnCancel.Location = new Point(230, 93);
-        _btnCancel.Name = "_btnCancel";
-        _btnCancel.Size = new Size(106, 27);
-        _btnCancel.TabIndex = 3;
-        _btnCancel.Text = "Отмена";
-        _btnCancel.UseVisualStyleBackColor = true;
-
-        AcceptButton = _btnOk;
-        AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
-        CancelButton = _btnCancel;
-        ClientSize = new Size(360, 145);
-        Controls.AddRange(new Control[]
+        protected override void Dispose(bool disposing)
         {
-            _lblMinutes,
-            _numMinutes,
-            _btnOk,
-            _btnCancel
-        });
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        MinimumSize = new Size(376, 184);
-        Name = "ExtendSessionDialog";
-        StartPosition = FormStartPosition.CenterParent;
-        Text = "Продление сеанса";
-        ((System.ComponentModel.ISupportInitialize)_numMinutes).EndInit();
-        ResumeLayout(false);
-        PerformLayout();
+            if (disposing && components != null)
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.lblMinutes = new System.Windows.Forms.Label();
+            this.numMinutes = new System.Windows.Forms.NumericUpDown();
+            this.btnOk = new System.Windows.Forms.Button();
+            this.btnCancel = new System.Windows.Forms.Button();
+            this.lblMessage = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.numMinutes)).BeginInit();
+            this.SuspendLayout();
+            this.lblMinutes.AutoSize = true;
+            this.lblMinutes.Location = new System.Drawing.Point(24, 32);
+            this.lblMinutes.Name = "lblMinutes";
+            this.lblMinutes.Size = new System.Drawing.Size(61, 19);
+            this.lblMinutes.TabIndex = 0;
+            this.lblMinutes.Text = "Минуты";
+            this.numMinutes.Location = new System.Drawing.Point(120, 28);
+            this.numMinutes.Maximum = new decimal(new int[] { 720, 0, 0, 0 });
+            this.numMinutes.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.numMinutes.Name = "numMinutes";
+            this.numMinutes.Size = new System.Drawing.Size(150, 25);
+            this.numMinutes.TabIndex = 1;
+            this.numMinutes.Value = new decimal(new int[] { 30, 0, 0, 0 });
+            this.btnOk.Location = new System.Drawing.Point(120, 76);
+            this.btnOk.Name = "btnOk";
+            this.btnOk.Size = new System.Drawing.Size(70, 32);
+            this.btnOk.TabIndex = 2;
+            this.btnOk.Text = "ОК";
+            this.btnOk.UseVisualStyleBackColor = true;
+            this.btnOk.Click += new System.EventHandler(this.OnOkClick);
+            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnCancel.Location = new System.Drawing.Point(200, 76);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(70, 32);
+            this.btnCancel.TabIndex = 3;
+            this.btnCancel.Text = "Отмена";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            this.lblMessage.ForeColor = System.Drawing.Color.DarkRed;
+            this.lblMessage.Location = new System.Drawing.Point(24, 120);
+            this.lblMessage.Name = "lblMessage";
+            this.lblMessage.Size = new System.Drawing.Size(246, 28);
+            this.lblMessage.TabIndex = 4;
+            this.AcceptButton = this.btnOk;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.CancelButton = this.btnCancel;
+            this.ClientSize = new System.Drawing.Size(320, 170);
+            this.Controls.Add(this.lblMinutes);
+            this.Controls.Add(this.numMinutes);
+            this.Controls.Add(this.btnOk);
+            this.Controls.Add(this.btnCancel);
+            this.Controls.Add(this.lblMessage);
+            this.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.Name = "ExtendSessionDialog";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "Продление сеанса";
+            ((System.ComponentModel.ISupportInitialize)(this.numMinutes)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+        }
     }
 }

@@ -1,142 +1,139 @@
-#nullable enable
-
-namespace ComputerClubWinForms.Forms;
-
-partial class ReportPage
+namespace ComputerClubWinForms.Forms
 {
-    private Label _fromLabel = null!;
-    private Label _toLabel = null!;
-    private DateTimePicker _dtpFrom = null!;
-    private DateTimePicker _dtpTo = null!;
-    private Button _btnGenerate = null!;
-    private Button _btnCompare = null!;
-    private Button _btnExportPdf = null!;
-    private DataGridView _dgvReport = null!;
-    private Label _lblTotalRevenue = null!;
-
-    private void InitializeComponent()
+    partial class ReportPage
     {
-        _fromLabel = new Label();
-        _dtpFrom = new DateTimePicker();
-        _toLabel = new Label();
-        _dtpTo = new DateTimePicker();
-        _btnGenerate = new Button();
-        _btnCompare = new Button();
-        _btnExportPdf = new Button();
-        _dgvReport = new DataGridView();
-        _lblTotalRevenue = new Label();
-        ((System.ComponentModel.ISupportInitialize)_dgvReport).BeginInit();
-        SuspendLayout();
-        // 
-        // _fromLabel
-        // 
-        _fromLabel.AutoSize = true;
-        _fromLabel.Location = new Point(12, 20);
-        _fromLabel.Name = "_fromLabel";
-        _fromLabel.Size = new Size(58, 15);
-        _fromLabel.TabIndex = 0;
-        _fromLabel.Text = "Период с";
-        // 
-        // _dtpFrom
-        // 
-        _dtpFrom.Format = DateTimePickerFormat.Short;
-        _dtpFrom.Location = new Point(78, 16);
-        _dtpFrom.Name = "_dtpFrom";
-        _dtpFrom.Size = new Size(120, 23);
-        _dtpFrom.TabIndex = 1;
-        _dtpFrom.Value = new DateTime(2026, 5, 10, 0, 0, 0, 0);
-        // 
-        // _toLabel
-        // 
-        _toLabel.AutoSize = true;
-        _toLabel.Location = new Point(214, 20);
-        _toLabel.Name = "_toLabel";
-        _toLabel.Size = new Size(21, 15);
-        _toLabel.TabIndex = 2;
-        _toLabel.Text = "по";
-        // 
-        // _dtpTo
-        // 
-        _dtpTo.Format = DateTimePickerFormat.Short;
-        _dtpTo.Location = new Point(246, 16);
-        _dtpTo.Name = "_dtpTo";
-        _dtpTo.Size = new Size(120, 23);
-        _dtpTo.TabIndex = 3;
-        _dtpTo.Value = new DateTime(2026, 5, 16, 0, 0, 0, 0);
-        // 
-        // _btnGenerate
-        // 
-        _btnGenerate.Location = new Point(382, 14);
-        _btnGenerate.Name = "_btnGenerate";
-        _btnGenerate.Size = new Size(118, 27);
-        _btnGenerate.TabIndex = 4;
-        _btnGenerate.Text = "Сформировать";
-        _btnGenerate.UseVisualStyleBackColor = true;
-        _btnGenerate.Click += OnGenerateClick;
-        // 
-        // _btnCompare
-        // 
-        _btnCompare.Location = new Point(506, 14);
-        _btnCompare.Name = "_btnCompare";
-        _btnCompare.Size = new Size(92, 27);
-        _btnCompare.TabIndex = 5;
-        _btnCompare.Text = "Сравнить";
-        _btnCompare.UseVisualStyleBackColor = true;
-        _btnCompare.Click += OnCompareClick;
-        // 
-        // _btnExportPdf
-        // 
-        _btnExportPdf.Location = new Point(604, 14);
-        _btnExportPdf.Name = "_btnExportPdf";
-        _btnExportPdf.Size = new Size(110, 27);
-        _btnExportPdf.TabIndex = 6;
-        _btnExportPdf.Text = "Экспорт в PDF";
-        _btnExportPdf.UseVisualStyleBackColor = true;
-        _btnExportPdf.Click += OnExportPdfClick;
-        // 
-        // _dgvReport
-        // 
-        _dgvReport.AllowUserToAddRows = false;
-        _dgvReport.AllowUserToDeleteRows = false;
-        _dgvReport.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        _dgvReport.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        _dgvReport.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-        _dgvReport.Location = new Point(12, 54);
-        _dgvReport.Name = "_dgvReport";
-        _dgvReport.ReadOnly = true;
-        _dgvReport.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-        _dgvReport.Size = new Size(1532, 653);
-        _dgvReport.TabIndex = 7;
-        // 
-        // _lblTotalRevenue
-        // 
-        _lblTotalRevenue.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        _lblTotalRevenue.AutoSize = true;
-        _lblTotalRevenue.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        _lblTotalRevenue.Location = new Point(12, 723);
-        _lblTotalRevenue.Name = "_lblTotalRevenue";
-        _lblTotalRevenue.Size = new Size(158, 15);
-        _lblTotalRevenue.TabIndex = 8;
-        _lblTotalRevenue.Text = "Итого: 0 сеансов, 0,00 руб.";
-        // 
-        // ReportPage
-        // 
-        AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
-        Controls.Add(_fromLabel);
-        Controls.Add(_dtpFrom);
-        Controls.Add(_toLabel);
-        Controls.Add(_dtpTo);
-        Controls.Add(_btnGenerate);
-        Controls.Add(_btnCompare);
-        Controls.Add(_btnExportPdf);
-        Controls.Add(_dgvReport);
-        Controls.Add(_lblTotalRevenue);
-        Name = "ReportPage";
-        Padding = new Padding(12);
-        Size = new Size(1556, 755);
-        ((System.ComponentModel.ISupportInitialize)_dgvReport).EndInit();
-        ResumeLayout(false);
-        PerformLayout();
+        private System.ComponentModel.IContainer? components = null;
+        private System.Windows.Forms.Panel topPanel = null!;
+        private System.Windows.Forms.Label lblStart = null!;
+        private System.Windows.Forms.DateTimePicker dateStart = null!;
+        private System.Windows.Forms.Label lblEnd = null!;
+        private System.Windows.Forms.DateTimePicker dateEnd = null!;
+        private System.Windows.Forms.Button btnGenerate = null!;
+        private System.Windows.Forms.Button btnCompare = null!;
+        private System.Windows.Forms.Button btnExport = null!;
+        private System.Windows.Forms.DataGridView gridReport = null!;
+        private System.Windows.Forms.Label lblSummary = null!;
+        private System.Windows.Forms.Label lblMessage = null!;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && components != null)
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.topPanel = new System.Windows.Forms.Panel();
+            this.lblStart = new System.Windows.Forms.Label();
+            this.dateStart = new System.Windows.Forms.DateTimePicker();
+            this.lblEnd = new System.Windows.Forms.Label();
+            this.dateEnd = new System.Windows.Forms.DateTimePicker();
+            this.btnGenerate = new System.Windows.Forms.Button();
+            this.btnCompare = new System.Windows.Forms.Button();
+            this.btnExport = new System.Windows.Forms.Button();
+            this.gridReport = new System.Windows.Forms.DataGridView();
+            this.lblSummary = new System.Windows.Forms.Label();
+            this.lblMessage = new System.Windows.Forms.Label();
+            this.topPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.gridReport)).BeginInit();
+            this.SuspendLayout();
+            this.topPanel.Controls.Add(this.lblStart);
+            this.topPanel.Controls.Add(this.dateStart);
+            this.topPanel.Controls.Add(this.lblEnd);
+            this.topPanel.Controls.Add(this.dateEnd);
+            this.topPanel.Controls.Add(this.btnGenerate);
+            this.topPanel.Controls.Add(this.btnCompare);
+            this.topPanel.Controls.Add(this.btnExport);
+            this.topPanel.Dock = System.Windows.Forms.DockStyle.Top;
+            this.topPanel.Location = new System.Drawing.Point(0, 0);
+            this.topPanel.Name = "topPanel";
+            this.topPanel.Size = new System.Drawing.Size(920, 64);
+            this.topPanel.TabIndex = 0;
+            this.lblStart.AutoSize = true;
+            this.lblStart.Location = new System.Drawing.Point(16, 22);
+            this.lblStart.Name = "lblStart";
+            this.lblStart.Size = new System.Drawing.Size(56, 19);
+            this.lblStart.TabIndex = 0;
+            this.lblStart.Text = "Начало";
+            this.dateStart.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dateStart.Location = new System.Drawing.Point(80, 18);
+            this.dateStart.Name = "dateStart";
+            this.dateStart.Size = new System.Drawing.Size(130, 25);
+            this.dateStart.TabIndex = 1;
+            this.lblEnd.AutoSize = true;
+            this.lblEnd.Location = new System.Drawing.Point(230, 22);
+            this.lblEnd.Name = "lblEnd";
+            this.lblEnd.Size = new System.Drawing.Size(48, 19);
+            this.lblEnd.TabIndex = 2;
+            this.lblEnd.Text = "Конец";
+            this.dateEnd.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dateEnd.Location = new System.Drawing.Point(288, 18);
+            this.dateEnd.Name = "dateEnd";
+            this.dateEnd.Size = new System.Drawing.Size(130, 25);
+            this.dateEnd.TabIndex = 3;
+            this.btnGenerate.Location = new System.Drawing.Point(440, 16);
+            this.btnGenerate.Name = "btnGenerate";
+            this.btnGenerate.Size = new System.Drawing.Size(130, 34);
+            this.btnGenerate.TabIndex = 4;
+            this.btnGenerate.Text = "Сформировать";
+            this.btnGenerate.UseVisualStyleBackColor = true;
+            this.btnGenerate.Click += new System.EventHandler(this.OnGenerateClick);
+            this.btnCompare.Location = new System.Drawing.Point(584, 16);
+            this.btnCompare.Name = "btnCompare";
+            this.btnCompare.Size = new System.Drawing.Size(110, 34);
+            this.btnCompare.TabIndex = 5;
+            this.btnCompare.Text = "Сравнить";
+            this.btnCompare.UseVisualStyleBackColor = true;
+            this.btnCompare.Click += new System.EventHandler(this.OnCompareClick);
+            this.btnExport.Location = new System.Drawing.Point(708, 16);
+            this.btnExport.Name = "btnExport";
+            this.btnExport.Size = new System.Drawing.Size(120, 34);
+            this.btnExport.TabIndex = 6;
+            this.btnExport.Text = "Экспорт PDF";
+            this.btnExport.UseVisualStyleBackColor = true;
+            this.btnExport.Click += new System.EventHandler(this.OnExportClick);
+            this.gridReport.AllowUserToAddRows = false;
+            this.gridReport.AllowUserToDeleteRows = false;
+            this.gridReport.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.gridReport.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.gridReport.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.gridReport.Location = new System.Drawing.Point(0, 64);
+            this.gridReport.Name = "gridReport";
+            this.gridReport.ReadOnly = true;
+            this.gridReport.Size = new System.Drawing.Size(920, 408);
+            this.gridReport.TabIndex = 1;
+            this.lblSummary.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.lblSummary.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
+            this.lblSummary.Location = new System.Drawing.Point(0, 472);
+            this.lblSummary.Name = "lblSummary";
+            this.lblSummary.Padding = new System.Windows.Forms.Padding(12, 0, 0, 0);
+            this.lblSummary.Size = new System.Drawing.Size(920, 34);
+            this.lblSummary.TabIndex = 2;
+            this.lblSummary.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.lblMessage.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.lblMessage.Location = new System.Drawing.Point(0, 506);
+            this.lblMessage.Name = "lblMessage";
+            this.lblMessage.Padding = new System.Windows.Forms.Padding(12, 0, 0, 0);
+            this.lblMessage.Size = new System.Drawing.Size(920, 34);
+            this.lblMessage.TabIndex = 3;
+            this.lblMessage.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.Controls.Add(this.gridReport);
+            this.Controls.Add(this.lblMessage);
+            this.Controls.Add(this.lblSummary);
+            this.Controls.Add(this.topPanel);
+            this.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.Name = "ReportPage";
+            this.Size = new System.Drawing.Size(920, 540);
+            this.topPanel.ResumeLayout(false);
+            this.topPanel.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.gridReport)).EndInit();
+            this.ResumeLayout(false);
+        }
     }
 }

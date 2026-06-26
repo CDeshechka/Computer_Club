@@ -15,6 +15,16 @@ public class Session
     public decimal OneTimeDiscountPercent { get; set; }
     public decimal PersonalDiscountPercent { get; set; }
     public bool IsCompleted { get; set; }
-
-    public TimeSpan RemainingTime => PlannedEndTime - DateTime.Now;
+    public TimeSpan RemainingTime
+    {
+        get
+        {
+            if (IsCompleted)
+            {
+                return TimeSpan.Zero;
+            }
+            var remaining = PlannedEndTime - DateTime.Now;
+            return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        }
+    }
 }

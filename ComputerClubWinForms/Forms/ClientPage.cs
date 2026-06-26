@@ -1,231 +1,148 @@
-using System.ComponentModel;
 using ComputerClubWinForms.Managers;
 using ComputerClubWinForms.Models;
 
-namespace ComputerClubWinForms.Forms
+namespace ComputerClubWinForms.Forms;
+
+public partial class ClientPage : UserControl
 {
-    public partial class ClientPage : UserControl
+    private ClientManager? _clientManager;
+
+    public event EventHandler? ClientsChanged;
+
+    public ClientPage()
     {
-        private ClientManager? _clientManager;
+        InitializeComponent();
+    }
 
-        public event EventHandler? ClientsChanged;
+    public ClientPage(ClientManager clientManager) : this()
+    {
+        _clientManager = clientManager;
+        LoadClients();
+    }
 
-        public ClientPage()
+    public void LoadClients()
+    {
+        if (_clientManager == null)
         {
-            InitializeComponent();
-            EnsureClientGridColumns();
-
-            
-            if (IsDesignMode())
-                LoadDesignPreview();
+            ShowClients(new List<Client>());
+            return;
         }
 
-        public ClientPage(ClientManager clientManager) : this()
+        ShowClients(_clientManager.GetAllClients(txtSearch.Text));
+    }
+
+    public void ShowClients(List<Client> clients)
+    {
+        gridClients.DataSource = clients.Select(c => new
         {
-            _clientManager = clientManager;
-            _gridClients.DataSource = null;
-            _gridClients.Rows.Clear();
-            Load += ClientPage_Load;
+            c.Id,
+            ФИО = c.FullName,
+            Телефон = c.Phone,
+            Часы = Math.Round(c.TotalHours, 2),
+            Потрачено = c.TotalSpent,
+            Скидка = c.DiscountPercent
+        }).ToList();
+        if (gridClients.Columns["Id"] != null)
+        {
+            gridClients.Columns["Id"]!.Visible = false;
+        }
+    }
+
+    private void OnSearchTextChanged(object? sender, EventArgs e)
+    {
+        LoadClients();
+    }
+
+    private void OnAddClick(object? sender, EventArgs e)
+    {
+        if (_clientManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private void ClientPage_Load(object? sender, EventArgs e)
+        using var dialog = new ClientEditDialog();
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        var client = new Client { FullName = dialog.ClientFullName, Phone = dialog.ClientPhone };
+        if (_clientManager.AddClient(client))
         {
             LoadClients();
+            ClientsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        ShowMessage(_clientManager.LastMessage, _clientManager.LastMessage.Contains("добавлен"));
+    }
+
+    private void OnEditClick(object? sender, EventArgs e)
+    {
+        if (_clientManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private void LoadDesignPreview()
+        var client = GetSelectedClient();
+        if (client == null)
         {
-            ShowRows(new List<ClientGridRow>
-            {
-                new ClientGridRow { Id = 1, FullName = "Иванов Иван", Phone = "+7 900 111-22-33", TotalHours = 12.5, TotalSpent = 1875m, DiscountPercent = 5 },
-                new ClientGridRow { Id = 2, FullName = "Петров Пётр", Phone = "+7 900 222-33-44", TotalHours = 31.0, TotalSpent = 4650m, DiscountPercent = 15 }
-            });
+            ShowMessage("Клиент не выбран.", false);
+            return;
+        }
+        using var dialog = new ClientEditDialog(client.FullName, client.Phone);
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        client.FullName = dialog.ClientFullName;
+        client.Phone = dialog.ClientPhone;
+        if (_clientManager.EditClient(client))
+        {
+            LoadClients();
+            ClientsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        ShowMessage(_clientManager.LastMessage, _clientManager.LastMessage.Contains("изменены"));
+    }
+
+    private void OnDeleteClick(object? sender, EventArgs e)
+    {
+        if (_clientManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private static bool IsDesignMode()
+        var client = GetSelectedClient();
+        if (client == null)
         {
-            return LicenseManager.UsageMode == LicenseUsageMode.Designtime;
+            ShowMessage("Клиент не выбран.", false);
+            return;
         }
-
-        private void EnsureClientGridColumns()
+        if (MessageBox.Show("Удалить выбранного клиента?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
-            if (_gridClients.Columns.Count > 0)
-                return;
-
-            _gridClients.AutoGenerateColumns = false;
-            _gridClients.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ClientGridRow.Id), DataPropertyName = nameof(ClientGridRow.Id), HeaderText = "ID", MinimumWidth = 50, ReadOnly = true });
-            _gridClients.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ClientGridRow.FullName), DataPropertyName = nameof(ClientGridRow.FullName), HeaderText = "ФИО", ReadOnly = true });
-            _gridClients.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ClientGridRow.Phone), DataPropertyName = nameof(ClientGridRow.Phone), HeaderText = "Телефон", ReadOnly = true });
-            _gridClients.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ClientGridRow.TotalHours), DataPropertyName = nameof(ClientGridRow.TotalHours), HeaderText = "Всего часов", ReadOnly = true });
-            _gridClients.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ClientGridRow.TotalSpent), DataPropertyName = nameof(ClientGridRow.TotalSpent), HeaderText = "Всего потрачено", ReadOnly = true });
-            _gridClients.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ClientGridRow.DiscountPercent), DataPropertyName = nameof(ClientGridRow.DiscountPercent), HeaderText = "Скидка, %", ReadOnly = true });
+            return;
         }
-
-        private void OnSearchTextChanged(object? sender, EventArgs e)
+        if (_clientManager.DeleteClient(client.Id))
         {
-            if (_clientManager is not null)
-                LoadClients();
+            LoadClients();
+            ClientsChanged?.Invoke(this, EventArgs.Empty);
         }
+        ShowMessage(_clientManager.LastMessage, _clientManager.LastMessage.Contains("удалён"));
+    }
 
-        private void LoadClients()
+    private Client? GetSelectedClient()
+    {
+        if (_clientManager == null || gridClients.CurrentRow == null || gridClients.CurrentRow.Cells["Id"].Value == null)
         {
-            if (_clientManager is null)
-                return;
-
-            try
-            {
-                var clients = _clientManager.GetAllClients(_txtSearch.Text);
-                ShowClients(clients);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Не удалось загрузить клиентов: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        public void ShowClients(List<Client> clients)
-        {
-            var rows = clients.Select(c => new ClientGridRow
-            {
-                Id = c.Id,
-                FullName = c.FullName,
-                Phone = c.Phone,
-                TotalHours = Math.Round(c.TotalHours, 2),
-                TotalSpent = c.TotalSpent,
-                DiscountPercent = c.DiscountPercent
-            }).ToList();
-
-            ShowRows(rows);
-        }
-
-        private void ShowRows(List<ClientGridRow> rows)
-        {
-            EnsureClientGridColumns();
-            _gridClients.DataSource = null;
-            _gridClients.DataSource = rows;
-        }
-
-        private void OnAddClientClick(object? sender, EventArgs e)
-        {
-            if (_clientManager is null)
-            {
-                ShowMessage(false, "Форма открыта в режиме конструктора. Запустите приложение для работы с клиентами.");
-                return;
-            }
-
-            using var dialog = new ClientEditDialog();
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var success = _clientManager.AddClient(dialog.Client);
-            ShowMessage(success, _clientManager.LastMessage);
-            if (success)
-            {
-                LoadClients();
-                ClientsChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        private void OnEditClientClick(object? sender, EventArgs e)
-        {
-            if (_clientManager is null)
-            {
-                ShowMessage(false, "Форма открыта в режиме конструктора. Запустите приложение для редактирования клиентов.");
-                return;
-            }
-
-            var row = GetSelectedRow();
-            if (row is null)
-            {
-                MessageBox.Show("Выберите клиента для редактирования", "Клиенты", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var client = _clientManager.GetClientById(row.Id);
-            if (client is null)
-            {
-                MessageBox.Show("Клиент не найден", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                LoadClients();
-                return;
-            }
-
-            using var dialog = new ClientEditDialog(client);
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var success = _clientManager.EditClient(dialog.Client);
-            ShowMessage(success, _clientManager.LastMessage);
-            if (success)
-            {
-                LoadClients();
-                ClientsChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        private void OnDeleteClientClick(object? sender, EventArgs e)
-        {
-            if (_clientManager is null)
-            {
-                ShowMessage(false, "Форма открыта в режиме конструктора. Запустите приложение для удаления клиентов.");
-                return;
-            }
-
-            var row = GetSelectedRow();
-            if (row is null)
-            {
-                MessageBox.Show("Выберите клиента для удаления", "Клиенты", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var confirm = MessageBox.Show($"Удалить клиента \"{row.FullName}\"?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
-
-            var success = _clientManager.DeleteClient(row.Id);
-            ShowMessage(success, _clientManager.LastMessage);
-            if (success)
-            {
-                LoadClients();
-                ClientsChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        public void ShowMessage(bool success, string message)
-        {
-            MessageBox.Show(message, success ? "Готово" : "Ошибка", MessageBoxButtons.OK, success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
-        }
-
-        private ClientGridRow? GetSelectedRow()
-        {
-            if (_gridClients.CurrentRow?.DataBoundItem is ClientGridRow row)
-                return row;
-
-            if (_gridClients.CurrentRow is not null && _gridClients.CurrentRow.Cells[0].Value is not null)
-            {
-                return new ClientGridRow
-                {
-                    Id = Convert.ToInt32(_gridClients.CurrentRow.Cells[0].Value),
-                    FullName = Convert.ToString(_gridClients.CurrentRow.Cells[1].Value) ?? string.Empty
-                };
-            }
-
             return null;
         }
+        var id = Convert.ToInt32(gridClients.CurrentRow.Cells["Id"].Value);
+        return _clientManager.GetClientById(id);
+    }
 
-        private void OnGridClientsCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex >= 0)
-                OnEditClientClick(sender, EventArgs.Empty);
-        }
-
-        private class ClientGridRow
-        {
-            public int Id { get; set; }
-            public string FullName { get; set; } = string.Empty;
-            public string Phone { get; set; } = string.Empty;
-            public double TotalHours { get; set; }
-            public decimal TotalSpent { get; set; }
-            public int DiscountPercent { get; set; }
-        }
+    private void ShowMessage(string message, bool success)
+    {
+        lblMessage.ForeColor = success ? Color.DarkGreen : Color.DarkRed;
+        lblMessage.Text = message;
     }
 }

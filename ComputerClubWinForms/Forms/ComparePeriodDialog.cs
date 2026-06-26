@@ -1,27 +1,25 @@
-namespace ComputerClubWinForms.Forms
+namespace ComputerClubWinForms.Forms;
+
+public partial class ComparePeriodDialog : Form
 {
-    public partial class ComparePeriodDialog : Form
+    public DateTime PeriodStart => dateStart.Value.Date;
+    public DateTime PeriodEnd => dateEnd.Value.Date;
+
+    public ComparePeriodDialog()
     {
-        public DateTime OtherStart => _dtpOtherStart.Value.Date;
-        public DateTime OtherEnd => _dtpOtherEnd.Value.Date;
+        InitializeComponent();
+        dateStart.Value = DateTime.Now.Date.AddDays(-14);
+        dateEnd.Value = DateTime.Now.Date.AddDays(-8);
+    }
 
-        public ComparePeriodDialog()
+    private void OnOkClick(object? sender, EventArgs e)
+    {
+        if (PeriodStart > PeriodEnd)
         {
-            InitializeComponent();
-            _dtpOtherStart.Value = DateTime.Now.Date.AddDays(-14);
-            _dtpOtherEnd.Value = DateTime.Now.Date.AddDays(-8);
+            lblMessage.Text = "Начальная дата больше конечной.";
+            return;
         }
-
-        private void OnOkClick(object? sender, EventArgs e)
-        {
-            if (OtherStart > OtherEnd)
-            {
-                MessageBox.Show("Начальная дата не может быть позже конечной", "Проверка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            DialogResult = DialogResult.OK;
-            Close();
-        }
+        DialogResult = DialogResult.OK;
+        Close();
     }
 }

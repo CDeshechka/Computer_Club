@@ -1,14 +1,12 @@
-using System.Globalization;
-using Microsoft.Data.Sqlite;
 using ComputerClubWinForms.Data;
 using ComputerClubWinForms.Models;
+using Npgsql;
 
 namespace ComputerClubWinForms.Managers;
 
 public class ClientManager
 {
     private readonly DatabaseHelper _db;
-
     public string LastMessage { get; private set; } = string.Empty;
 
     public ClientManager(DatabaseHelper db)
@@ -18,128 +16,123 @@ public class ClientManager
 
     public bool AddClient(Client client)
     {
+        LastMessage = string.Empty;
         if (!ValidateClient(client))
+        {
             return false;
-
+        }
         try
         {
             using var connection = _db.CreateConnection();
-            if (PhoneExists(connection, client.Phone, null))
-                return Fail("Клиент с таким телефоном уже зарегистрирован");
-
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                INSERT INTO Clients(FullName, Phone, TotalHours, TotalSpent, DiscountPercent)
-                VALUES ($fullName, $phone, 0, 0, 0)
-                """;
-            command.Parameters.AddWithValue("$fullName", client.FullName.Trim());
-            command.Parameters.AddWithValue("$phone", client.Phone.Trim());
+            connection.Open();
+            using var command = new NpgsqlCommand("INSERT INTO clients(full_name, phone, total_hours, total_spent, discount_percent) VALUES (@fullName, @phone, 0, 0, 0)", connection);
+            command.Parameters.AddWithValue("fullName", client.FullName.Trim());
+            command.Parameters.AddWithValue("phone", client.Phone.Trim());
             command.ExecuteNonQuery();
-
-            return Ok("Клиент добавлен");
+            LastMessage = "Клиент добавлен.";
+            return true;
         }
-        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
+        catch (PostgresException ex) when (ex.SqlState == "23505")
         {
-            return Fail("Клиент с таким телефоном уже зарегистрирован");
-        }
-        catch (Exception ex)
-        {
-            return Fail($"Ошибка базы данных: {ex.Message}");
+            LastMessage = "Клиент с таким телефоном уже существует.";
+            return false;
         }
     }
 
     public bool EditClient(Client client)
     {
-        if (!ValidateClient(client))
+        LastMessage = string.Empty;
+        if (client.Id <= 0)
+        {
+            LastMessage = "Клиент не выбран.";
             return false;
-
+        }
+        if (!ValidateClient(client))
+        {
+            return false;
+        }
         try
         {
             using var connection = _db.CreateConnection();
-            if (PhoneExists(connection, client.Phone, client.Id))
-                return Fail("Телефон уже занят другим клиентом");
-
-            using var command = connection.CreateCommand();
-            command.CommandText = "UPDATE Clients SET FullName = $fullName, Phone = $phone WHERE Id = $id";
-            command.Parameters.AddWithValue("$fullName", client.FullName.Trim());
-            command.Parameters.AddWithValue("$phone", client.Phone.Trim());
-            command.Parameters.AddWithValue("$id", client.Id);
-
-            var affected = command.ExecuteNonQuery();
-            return affected > 0 ? Ok("Клиент обновлён") : Fail("Клиент не найден");
+            connection.Open();
+            using var command = new NpgsqlCommand("UPDATE clients SET full_name = @fullName, phone = @phone WHERE id = @id", connection);
+            command.Parameters.AddWithValue("id", client.Id);
+            command.Parameters.AddWithValue("fullName", client.FullName.Trim());
+            command.Parameters.AddWithValue("phone", client.Phone.Trim());
+            var rows = command.ExecuteNonQuery();
+            LastMessage = rows > 0 ? "Данные клиента изменены." : "Клиент не найден.";
+            return rows > 0;
         }
-        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
+        catch (PostgresException ex) when (ex.SqlState == "23505")
         {
-            return Fail("Телефон уже занят другим клиентом");
-        }
-        catch (Exception ex)
-        {
-            return Fail($"Ошибка базы данных: {ex.Message}");
+            LastMessage = "Клиент с таким телефоном уже существует.";
+            return false;
         }
     }
 
     public bool DeleteClient(int clientId)
     {
-        try
+        LastMessage = string.Empty;
+        if (clientId <= 0)
         {
-            using var connection = _db.CreateConnection();
-            if (HasActiveSession(connection, clientId))
-                return Fail("Невозможно удалить клиента: у него есть активный сеанс");
-
-            using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM Clients WHERE Id = $id";
-            command.Parameters.AddWithValue("$id", clientId);
-
-            var affected = command.ExecuteNonQuery();
-            return affected > 0 ? Ok("Клиент удалён") : Fail("Клиент не найден");
+            LastMessage = "Клиент не выбран.";
+            return false;
         }
-        catch (Exception ex)
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var activeCommand = new NpgsqlCommand("SELECT COUNT(*) FROM sessions WHERE client_id = @id AND is_completed = FALSE", connection);
+        activeCommand.Parameters.AddWithValue("id", clientId);
+        var activeCount = Convert.ToInt32(activeCommand.ExecuteScalar());
+        if (activeCount > 0)
         {
-            return Fail($"Ошибка базы данных: {ex.Message}");
+            LastMessage = "Нельзя удалить клиента с активным сеансом.";
+            return false;
         }
+        using var bookingCommand = new NpgsqlCommand("SELECT COUNT(*) FROM bookings WHERE client_id = @id AND status = 'active'", connection);
+        bookingCommand.Parameters.AddWithValue("id", clientId);
+        var bookingCount = Convert.ToInt32(bookingCommand.ExecuteScalar());
+        if (bookingCount > 0)
+        {
+            LastMessage = "Нельзя удалить клиента с активной бронью.";
+            return false;
+        }
+        using var command = new NpgsqlCommand("DELETE FROM clients WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", clientId);
+        var rows = command.ExecuteNonQuery();
+        LastMessage = rows > 0 ? "Клиент удалён." : "Клиент не найден.";
+        return rows > 0;
     }
 
     public List<Client> GetAllClients(string? searchText = null)
     {
+        var result = new List<Client>();
         using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-
-        if (string.IsNullOrWhiteSpace(searchText))
+        connection.Open();
+        var sql = "SELECT id, full_name, phone, total_hours, total_spent, discount_percent FROM clients";
+        if (!string.IsNullOrWhiteSpace(searchText))
         {
-            command.CommandText = "SELECT Id, FullName, Phone, TotalHours, TotalSpent, DiscountPercent FROM Clients ORDER BY FullName";
+            sql += " WHERE LOWER(full_name) LIKE @search OR LOWER(phone) LIKE @search";
         }
-        else
+        sql += " ORDER BY full_name";
+        using var command = new NpgsqlCommand(sql, connection);
+        if (!string.IsNullOrWhiteSpace(searchText))
         {
-            command.CommandText = """
-                SELECT Id, FullName, Phone, TotalHours, TotalSpent, DiscountPercent
-                FROM Clients
-                WHERE FullName LIKE $term OR Phone LIKE $term
-                ORDER BY FullName
-                """;
-            command.Parameters.AddWithValue("$term", $"%{searchText.Trim()}%");
+            command.Parameters.AddWithValue("search", "%" + searchText.Trim().ToLower() + "%");
         }
-
-        var clients = new List<Client>();
         using var reader = command.ExecuteReader();
         while (reader.Read())
-            clients.Add(ReadClient(reader));
-
-        return clients;
+        {
+            result.Add(ReadClient(reader));
+        }
+        return result;
     }
 
     public Client? GetClientById(int clientId)
     {
         using var connection = _db.CreateConnection();
-        return GetClientById(connection, null, clientId);
-    }
-
-    public Client? GetClientById(SqliteConnection connection, SqliteTransaction? transaction, int clientId)
-    {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT Id, FullName, Phone, TotalHours, TotalSpent, DiscountPercent FROM Clients WHERE Id = $id";
-        command.Parameters.AddWithValue("$id", clientId);
-
+        connection.Open();
+        using var command = new NpgsqlCommand("SELECT id, full_name, phone, total_hours, total_spent, discount_percent FROM clients WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", clientId);
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadClient(reader) : null;
     }
@@ -147,98 +140,70 @@ public class ClientManager
     public double GetClientTotalHours(int clientId)
     {
         using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT TotalHours FROM Clients WHERE Id = $id";
-        command.Parameters.AddWithValue("$id", clientId);
+        connection.Open();
+        using var command = new NpgsqlCommand("SELECT total_hours FROM clients WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", clientId);
         var value = command.ExecuteScalar();
-        return value is null || value is DBNull ? 0d : Convert.ToDouble(value, CultureInfo.InvariantCulture);
+        return value == null ? 0 : Convert.ToDouble(value);
     }
 
-    public bool UpdateClientStats(
-        int clientId,
-        double hours,
-        decimal spent,
-        int discount,
-        SqliteConnection connection,
-        SqliteTransaction transaction)
+    public bool UpdateClientStats(int clientId, double hours, decimal spent, NpgsqlConnection connection, NpgsqlTransaction transaction)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            UPDATE Clients
-            SET TotalHours = TotalHours + $hours,
-                TotalSpent = TotalSpent + $spent,
-                DiscountPercent = $discount
-            WHERE Id = $clientId
-            """;
-        command.Parameters.AddWithValue("$hours", hours);
-        command.Parameters.AddWithValue("$spent", spent);
-        command.Parameters.AddWithValue("$discount", discount);
-        command.Parameters.AddWithValue("$clientId", clientId);
-
-        return command.ExecuteNonQuery() > 0
-            ? Ok("Статистика клиента обновлена")
-            : Fail("Клиент не найден");
+        var newDiscount = GetPersonalDiscountByAddedHours(clientId, hours, connection, transaction);
+        using var command = new NpgsqlCommand("UPDATE clients SET total_hours = total_hours + @hours, total_spent = total_spent + @spent, discount_percent = @discount WHERE id = @id", connection, transaction);
+        command.Parameters.AddWithValue("id", clientId);
+        command.Parameters.AddWithValue("hours", hours);
+        command.Parameters.AddWithValue("spent", spent);
+        command.Parameters.AddWithValue("discount", newDiscount);
+        return command.ExecuteNonQuery() > 0;
     }
 
-    private static Client ReadClient(SqliteDataReader reader)
+    private int GetPersonalDiscountByAddedHours(int clientId, double addedHours, NpgsqlConnection connection, NpgsqlTransaction transaction)
+    {
+        using var command = new NpgsqlCommand("SELECT total_hours FROM clients WHERE id = @id FOR UPDATE", connection, transaction);
+        command.Parameters.AddWithValue("id", clientId);
+        var value = command.ExecuteScalar();
+        var totalHours = (value == null ? 0 : Convert.ToDouble(value)) + addedHours;
+        if (totalHours >= 100)
+        {
+            return 15;
+        }
+        if (totalHours >= 50)
+        {
+            return 10;
+        }
+        if (totalHours >= 20)
+        {
+            return 5;
+        }
+        return 0;
+    }
+
+    private static Client ReadClient(NpgsqlDataReader reader)
     {
         return new Client
         {
             Id = reader.GetInt32(0),
             FullName = reader.GetString(1),
             Phone = reader.GetString(2),
-            TotalHours = Convert.ToDouble(reader.GetValue(3), CultureInfo.InvariantCulture),
-            TotalSpent = Convert.ToDecimal(reader.GetValue(4), CultureInfo.InvariantCulture),
-            DiscountPercent = Convert.ToInt32(reader.GetValue(5), CultureInfo.InvariantCulture)
+            TotalHours = Convert.ToDouble(reader.GetDecimal(3)),
+            TotalSpent = reader.GetDecimal(4),
+            DiscountPercent = reader.GetInt32(5)
         };
     }
 
-    private bool ValidateClient(Client? client)
+    private bool ValidateClient(Client client)
     {
-        if (client is null)
-            return Fail("Данные клиента не переданы");
         if (string.IsNullOrWhiteSpace(client.FullName))
-            return Fail("Заполните ФИО клиента");
+        {
+            LastMessage = "Введите ФИО клиента.";
+            return false;
+        }
         if (string.IsNullOrWhiteSpace(client.Phone))
-            return Fail("Заполните телефон клиента");
-        return true;
-    }
-
-    private static bool PhoneExists(SqliteConnection connection, string phone, int? excludeClientId)
-    {
-        using var command = connection.CreateCommand();
-        if (excludeClientId.HasValue)
         {
-            command.CommandText = "SELECT COUNT(*) FROM Clients WHERE Phone = $phone AND Id <> $id";
-            command.Parameters.AddWithValue("$id", excludeClientId.Value);
+            LastMessage = "Введите телефон клиента.";
+            return false;
         }
-        else
-        {
-            command.CommandText = "SELECT COUNT(*) FROM Clients WHERE Phone = $phone";
-        }
-
-        command.Parameters.AddWithValue("$phone", phone.Trim());
-        return Convert.ToInt32(command.ExecuteScalar()) > 0;
-    }
-
-    private static bool HasActiveSession(SqliteConnection connection, int clientId)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM Sessions WHERE ClientId = $clientId AND IsCompleted = 0";
-        command.Parameters.AddWithValue("$clientId", clientId);
-        return Convert.ToInt32(command.ExecuteScalar()) > 0;
-    }
-
-    private bool Ok(string message)
-    {
-        LastMessage = message;
         return true;
-    }
-
-    private bool Fail(string message)
-    {
-        LastMessage = message;
-        return false;
     }
 }

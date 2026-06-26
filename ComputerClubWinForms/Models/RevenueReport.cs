@@ -12,22 +12,20 @@ public class RevenueReport
 
     public decimal GetRevenueDifference(RevenueReport other)
     {
-        return other.TotalRevenue - TotalRevenue;
+        return TotalRevenue - other.TotalRevenue;
     }
 
     public decimal GetRevenuePercentChange(RevenueReport other)
     {
-        if (TotalRevenue == 0m && other.TotalRevenue == 0m)
-            return 0m;
-        if (TotalRevenue == 0m)
-            return 100m;
-
-        return Math.Round((other.TotalRevenue - TotalRevenue) / TotalRevenue * 100m, 2);
+        if (other.TotalRevenue == 0)
+        {
+            return TotalRevenue == 0 ? 0 : 100;
+        }
+        return Math.Round((TotalRevenue - other.TotalRevenue) / other.TotalRevenue * 100, 2);
     }
 
     public bool ExportToPdf(string filePath)
     {
-        SimplePdfExporter.ExportRevenueReport(this, filePath);
-        return true;
+        return SimplePdfExporter.ExportRevenueReport(this, filePath);
     }
 }

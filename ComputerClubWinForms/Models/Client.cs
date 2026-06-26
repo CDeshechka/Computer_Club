@@ -8,6 +8,4 @@ public class Client
     public double TotalHours { get; set; }
     public decimal TotalSpent { get; set; }
     public int DiscountPercent { get; set; }
-
-    public override string ToString() => $"{FullName} ({Phone})";
 }

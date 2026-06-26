@@ -1,7 +1,7 @@
-using System.Globalization;
-using Microsoft.Data.Sqlite;
+using System.Data;
 using ComputerClubWinForms.Data;
 using ComputerClubWinForms.Models;
+using Npgsql;
 
 namespace ComputerClubWinForms.Managers;
 
@@ -10,7 +10,6 @@ public class SessionManager
     private readonly DatabaseHelper _db;
     private readonly ClientManager _clientManager;
     private readonly TariffManager _tariffManager;
-
     public string LastMessage { get; private set; } = string.Empty;
 
     public SessionManager(DatabaseHelper db, ClientManager clientManager, TariffManager tariffManager)
@@ -22,526 +21,508 @@ public class SessionManager
 
     public List<Computer> GetComputers()
     {
+        var result = new List<Computer>();
         using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Number, Name, IsActive FROM Computers WHERE IsActive = 1 ORDER BY Number";
-
-        var computers = new List<Computer>();
+        connection.Open();
+        using var command = new NpgsqlCommand("SELECT number, name, is_active FROM computers ORDER BY number", connection);
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            computers.Add(new Computer
+            result.Add(new Computer
             {
                 Number = reader.GetInt32(0),
                 Name = reader.GetString(1),
-                IsActive = reader.GetInt32(2) == 1
+                IsActive = reader.GetBoolean(2)
             });
         }
-
-        return computers;
+        return result;
     }
 
     public bool IsTimeSlotAvailable(DateTime start, TimeSpan duration, int computerNumber)
     {
         using var connection = _db.CreateConnection();
-        return IsTimeSlotAvailable(connection, null, start, duration, computerNumber, null, null);
+        connection.Open();
+        return IsTimeSlotAvailable(start, duration, computerNumber, connection, null, 0, 0);
     }
 
     public bool CreateBooking(int clientId, int computerNumber, DateTime start, TimeSpan duration)
     {
-        if (clientId <= 0) return SetMessage(false, "Клиент не выбран");
-        if (computerNumber <= 0) return SetMessage(false, "Компьютер не выбран");
-        if (duration.TotalMinutes <= 0) return SetMessage(false, "Длительность должна быть больше 0");
-        if (start <= DateTime.Now) return SetMessage(false, "Нельзя забронировать прошедшее время");
-
+        LastMessage = string.Empty;
+        if (!ValidateClientComputerDuration(clientId, computerNumber, duration))
+        {
+            return false;
+        }
+        if (start <= DateTime.Now)
+        {
+            LastMessage = "Нельзя забронировать прошедшее время.";
+            return false;
+        }
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         try
         {
-            using var connection = _db.CreateConnection();
-            if (_clientManager.GetClientById(connection, null, clientId) is null)
-                return SetMessage(false, "Клиент не найден");
-            if (!ComputerExists(connection, null, computerNumber))
-                return SetMessage(false, "Компьютер не найден");
-            if (!IsTimeSlotAvailable(connection, null, start, duration, computerNumber, null, null))
-                return SetMessage(false, $"Компьютер №{computerNumber} уже забронирован на это время. Выберите другое время или компьютер");
-
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                INSERT INTO Bookings(ClientId, ComputerNumber, PlannedStart, DurationMinutes, Status, CreatedAt)
-                VALUES ($clientId, $computer, $start, $duration, 'active', $createdAt)
-                """;
-            command.Parameters.AddWithValue("$clientId", clientId);
-            command.Parameters.AddWithValue("$computer", computerNumber);
-            command.Parameters.AddWithValue("$start", ToDbDate(start));
-            command.Parameters.AddWithValue("$duration", ToMinutes(duration));
-            command.Parameters.AddWithValue("$createdAt", ToDbDate(DateTime.Now));
+            if (!ClientExists(clientId, connection, transaction))
+            {
+                LastMessage = "Клиент не найден.";
+                transaction.Rollback();
+                return false;
+            }
+            if (!ComputerExists(computerNumber, connection, transaction))
+            {
+                LastMessage = "Компьютер не найден.";
+                transaction.Rollback();
+                return false;
+            }
+            if (!IsTimeSlotAvailable(start, duration, computerNumber, connection, transaction, 0, 0))
+            {
+                LastMessage = $"Компьютер №{computerNumber} уже занят на это время.";
+                transaction.Rollback();
+                return false;
+            }
+            using var command = new NpgsqlCommand("INSERT INTO bookings(client_id, computer_number, planned_start, duration_minutes, status) VALUES (@clientId, @computerNumber, @start, @duration, 'active')", connection, transaction);
+            command.Parameters.AddWithValue("clientId", clientId);
+            command.Parameters.AddWithValue("computerNumber", computerNumber);
+            command.Parameters.AddWithValue("start", start);
+            command.Parameters.AddWithValue("duration", (int)Math.Ceiling(duration.TotalMinutes));
             command.ExecuteNonQuery();
-
-            return SetMessage(true, "Бронь создана");
+            transaction.Commit();
+            LastMessage = "Бронь создана.";
+            return true;
         }
         catch (Exception ex)
         {
-            return SetMessage(false, "Ошибка базы данных. Бронь не сохранена. " + ex.Message);
+            transaction.Rollback();
+            LastMessage = "Ошибка базы данных. Бронь не сохранена. " + ex.Message;
+            return false;
         }
     }
 
-    public bool CancelBooking(int bookingId)
+    public bool DeleteBooking(int bookingId)
     {
-        try
+        LastMessage = string.Empty;
+        if (bookingId <= 0)
         {
-            using var connection = _db.CreateConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM Bookings WHERE Id = $id AND Status = 'active'";
-            command.Parameters.AddWithValue("$id", bookingId);
-            var affected = command.ExecuteNonQuery();
-            return SetMessage(affected > 0, affected > 0 ? "Бронь удалена" : "Бронь не найдена");
+            LastMessage = "Бронь не выбрана.";
+            return false;
         }
-        catch (Exception ex)
-        {
-            return SetMessage(false, "Ошибка базы данных: " + ex.Message);
-        }
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var command = new NpgsqlCommand("UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'active'", connection);
+        command.Parameters.AddWithValue("id", bookingId);
+        var rows = command.ExecuteNonQuery();
+        LastMessage = rows > 0 ? "Бронь отменена." : "Активная бронь не найдена.";
+        return rows > 0;
     }
 
     public Session? StartSession(int bookingId)
     {
+        LastMessage = string.Empty;
+        if (bookingId <= 0)
+        {
+            LastMessage = "Бронь не выбрана.";
+            return null;
+        }
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         try
         {
-            using var connection = _db.CreateConnection();
-            using var transaction = connection.BeginTransaction();
-            var booking = GetBookingById(connection, transaction, bookingId);
-
-            if (booking is null || booking.Status != "active")
+            var booking = GetBookingById(bookingId, connection, transaction);
+            if (booking == null || booking.Status != "active")
             {
-                LastMessage = "Бронь не найдена";
+                LastMessage = "Активная бронь не найдена.";
+                transaction.Rollback();
                 return null;
             }
-            if (ClientHasActiveSession(connection, transaction, booking.ClientId))
+            if (ClientHasActiveSession(booking.ClientId, connection, transaction))
             {
-                LastMessage = "Клиент уже на сеансе. Сначала завершите текущий";
+                LastMessage = "У клиента уже есть активный сеанс.";
+                transaction.Rollback();
                 return null;
             }
-
-            var start = DateTime.Now;
-            if (!IsTimeSlotAvailable(connection, transaction, start, booking.Duration, booking.ComputerNumber, booking.Id, null))
-            {
-                LastMessage = $"Компьютер №{booking.ComputerNumber} сейчас занят";
-                return null;
-            }
-
-            var session = InsertActiveSession(connection, transaction, booking.ClientId, booking.ComputerNumber, start, booking.Duration, booking.Id);
-
-            using var deleteBooking = connection.CreateCommand();
-            deleteBooking.Transaction = transaction;
-            deleteBooking.CommandText = "DELETE FROM Bookings WHERE Id = $id";
-            deleteBooking.Parameters.AddWithValue("$id", booking.Id);
-            deleteBooking.ExecuteNonQuery();
-
+            var session = InsertSession(booking.ClientId, booking.ComputerNumber, DateTime.Now, booking.Duration, connection, transaction);
+            using var updateCommand = new NpgsqlCommand("UPDATE bookings SET status = 'used' WHERE id = @id", connection, transaction);
+            updateCommand.Parameters.AddWithValue("id", booking.Id);
+            updateCommand.ExecuteNonQuery();
             transaction.Commit();
-            LastMessage = "Сеанс открыт по брони";
+            LastMessage = "Сеанс открыт по брони.";
             return session;
         }
         catch (Exception ex)
         {
-            LastMessage = "Ошибка базы данных: " + ex.Message;
+            transaction.Rollback();
+            LastMessage = "Ошибка открытия сеанса. " + ex.Message;
             return null;
         }
     }
 
     public Session? StartSessionDirect(int clientId, int computerNumber, DateTime start, TimeSpan duration)
     {
-        if (duration.TotalMinutes <= 0)
+        LastMessage = string.Empty;
+        if (!ValidateClientComputerDuration(clientId, computerNumber, duration))
         {
-            LastMessage = "Укажите корректную длительность";
             return null;
         }
-
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         try
         {
-            using var connection = _db.CreateConnection();
-            using var transaction = connection.BeginTransaction();
-
-            if (_clientManager.GetClientById(connection, transaction, clientId) is null)
+            if (!ClientExists(clientId, connection, transaction))
             {
-                LastMessage = "Клиент не найден";
+                LastMessage = "Клиент не найден.";
+                transaction.Rollback();
                 return null;
             }
-            if (!ComputerExists(connection, transaction, computerNumber))
+            if (!ComputerExists(computerNumber, connection, transaction))
             {
-                LastMessage = "Компьютер не найден";
+                LastMessage = "Компьютер не найден.";
+                transaction.Rollback();
                 return null;
             }
-            if (ClientHasActiveSession(connection, transaction, clientId))
+            if (ClientHasActiveSession(clientId, connection, transaction))
             {
-                LastMessage = "Клиент уже на сеансе. Сначала завершите текущий";
+                LastMessage = "У клиента уже есть активный сеанс.";
+                transaction.Rollback();
                 return null;
             }
-            if (!IsTimeSlotAvailable(connection, transaction, start, duration, computerNumber, null, null))
+            if (!IsTimeSlotAvailable(start, duration, computerNumber, connection, transaction, 0, 0))
             {
-                LastMessage = $"Компьютер №{computerNumber} занят на выбранное время";
+                LastMessage = $"Компьютер №{computerNumber} уже занят на выбранный интервал.";
+                transaction.Rollback();
                 return null;
             }
-
-            var session = InsertActiveSession(connection, transaction, clientId, computerNumber, start, duration, null);
+            var session = InsertSession(clientId, computerNumber, start, duration, connection, transaction);
             transaction.Commit();
-            LastMessage = "Сеанс открыт";
+            LastMessage = "Сеанс открыт.";
             return session;
         }
         catch (Exception ex)
         {
-            LastMessage = "Ошибка базы данных: " + ex.Message;
+            transaction.Rollback();
+            LastMessage = "Ошибка открытия сеанса. " + ex.Message;
             return null;
         }
     }
 
     public bool ExtendSession(int sessionId, TimeSpan additionalDuration)
     {
+        LastMessage = string.Empty;
+        if (sessionId <= 0)
+        {
+            LastMessage = "Сеанс не выбран.";
+            return false;
+        }
         if (additionalDuration.TotalMinutes <= 0)
-            return SetMessage(false, "Введите положительное число");
-
+        {
+            LastMessage = "Дополнительное время должно быть больше нуля.";
+            return false;
+        }
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         try
         {
-            using var connection = _db.CreateConnection();
-            using var transaction = connection.BeginTransaction();
-            var session = GetSessionById(connection, transaction, sessionId);
-
-            if (session is null) return SetMessage(false, "Сеанс не найден");
-            if (session.IsCompleted) return SetMessage(false, "Сеанс уже завершён");
-
-            var newPlannedEnd = session.PlannedEndTime.Add(additionalDuration);
-            if (!IsTimeSlotAvailable(connection, transaction, session.StartTime, newPlannedEnd - session.StartTime, session.ComputerNumber, null, session.Id))
-                return SetMessage(false, $"Невозможно продлить: компьютер №{session.ComputerNumber} забронирован на это время");
-
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = "UPDATE Sessions SET PlannedEndTime = $plannedEnd WHERE Id = $id AND IsCompleted = 0";
-            command.Parameters.AddWithValue("$plannedEnd", ToDbDate(newPlannedEnd));
-            command.Parameters.AddWithValue("$id", sessionId);
-            command.ExecuteNonQuery();
-
+            var session = GetSessionById(sessionId, connection, transaction);
+            if (session == null || session.IsCompleted)
+            {
+                LastMessage = "Активный сеанс не найден.";
+                transaction.Rollback();
+                return false;
+            }
+            var newDuration = session.PlannedEndTime.Add(additionalDuration) - session.StartTime;
+            if (!IsTimeSlotAvailable(session.StartTime, newDuration, session.ComputerNumber, connection, transaction, session.Id, 0))
+            {
+                LastMessage = "Продление невозможно: на это время есть бронь или другой сеанс.";
+                transaction.Rollback();
+                return false;
+            }
+            using var command = new NpgsqlCommand("UPDATE sessions SET planned_end_time = planned_end_time + (@minutes * INTERVAL '1 minute') WHERE id = @id AND is_completed = FALSE", connection, transaction);
+            command.Parameters.AddWithValue("id", sessionId);
+            command.Parameters.AddWithValue("minutes", (int)Math.Ceiling(additionalDuration.TotalMinutes));
+            var rows = command.ExecuteNonQuery();
             transaction.Commit();
-            return SetMessage(true, "Сеанс продлён");
+            LastMessage = rows > 0 ? "Сеанс продлён." : "Сеанс не найден.";
+            return rows > 0;
         }
         catch (Exception ex)
         {
-            return SetMessage(false, "Ошибка базы данных: " + ex.Message);
+            transaction.Rollback();
+            LastMessage = "Ошибка продления сеанса. " + ex.Message;
+            return false;
         }
     }
 
     public Session? PreviewCompletion(int sessionId)
     {
-        try
+        LastMessage = string.Empty;
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        var session = GetSessionById(sessionId, connection, null);
+        if (session == null || session.IsCompleted)
         {
-            using var connection = _db.CreateConnection();
-            var session = GetSessionById(connection, null, sessionId);
-            if (session is null)
-            {
-                LastMessage = "Сеанс не найден";
-                return null;
-            }
-            if (session.IsCompleted)
-            {
-                LastMessage = "Сеанс уже завершён";
-                return null;
-            }
-
-            return PrepareCompletedSession(session, DateTime.Now);
-        }
-        catch (Exception ex)
-        {
-            LastMessage = "Ошибка базы данных: " + ex.Message;
+            LastMessage = "Активный сеанс не найден.";
             return null;
         }
+        session.EndTime = DateTime.Now;
+        session.Duration = session.EndTime.Value - session.StartTime;
+        if (session.Duration.TotalMinutes < 1)
+        {
+            session.Duration = TimeSpan.FromMinutes(1);
+        }
+        _tariffManager.CalculateSessionCost(session);
+        LastMessage = "Расчёт подготовлен.";
+        return session;
     }
 
     public Session? CompleteSession(int sessionId)
     {
+        LastMessage = string.Empty;
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         try
         {
-            using var connection = _db.CreateConnection();
-            using var transaction = connection.BeginTransaction();
-            var session = GetSessionById(connection, transaction, sessionId);
-
-            if (session is null)
+            var session = GetSessionById(sessionId, connection, transaction);
+            if (session == null || session.IsCompleted)
             {
-                LastMessage = "Сеанс не найден";
-                return null;
-            }
-            if (session.IsCompleted)
-            {
-                LastMessage = "Сеанс уже завершён";
-                return null;
-            }
-
-            var completedSession = PrepareCompletedSession(session, DateTime.Now);
-            var durationMinutes = ToMinutes(completedSession.Duration);
-            var hours = durationMinutes / 60d;
-            var clientBefore = _clientManager.GetClientById(connection, transaction, session.ClientId);
-            var newDiscount = _tariffManager.GetPersonalDiscount((clientBefore?.TotalHours ?? 0d) + hours);
-
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = """
-                UPDATE Sessions
-                SET EndTime = $endTime,
-                    DurationMinutes = $durationMinutes,
-                    TotalCost = $totalCost,
-                    TariffPerHour = $tariff,
-                    OneTimeDiscountPercent = $oneTimeDiscount,
-                    PersonalDiscountPercent = $personalDiscount,
-                    IsCompleted = 1
-                WHERE Id = $id AND IsCompleted = 0
-                """;
-            command.Parameters.AddWithValue("$endTime", ToDbDate(completedSession.EndTime!.Value));
-            command.Parameters.AddWithValue("$durationMinutes", durationMinutes);
-            command.Parameters.AddWithValue("$totalCost", completedSession.TotalCost);
-            command.Parameters.AddWithValue("$tariff", completedSession.TariffPerHour);
-            command.Parameters.AddWithValue("$oneTimeDiscount", completedSession.OneTimeDiscountPercent);
-            command.Parameters.AddWithValue("$personalDiscount", completedSession.PersonalDiscountPercent);
-            command.Parameters.AddWithValue("$id", sessionId);
-            command.ExecuteNonQuery();
-
-            if (!_clientManager.UpdateClientStats(session.ClientId, hours, completedSession.TotalCost, newDiscount, connection, transaction))
-            {
+                LastMessage = "Активный сеанс не найден.";
                 transaction.Rollback();
-                LastMessage = _clientManager.LastMessage;
                 return null;
             }
-
+            session.EndTime = DateTime.Now;
+            session.Duration = session.EndTime.Value - session.StartTime;
+            if (session.Duration.TotalMinutes < 1)
+            {
+                session.Duration = TimeSpan.FromMinutes(1);
+            }
+            _tariffManager.CalculateSessionCost(session);
+            using var command = new NpgsqlCommand(@"
+UPDATE sessions
+SET end_time = @endTime,
+    duration_minutes = @duration,
+    total_cost = @cost,
+    tariff_per_hour = @tariff,
+    one_time_discount_percent = @oneTimeDiscount,
+    personal_discount_percent = @personalDiscount,
+    is_completed = TRUE
+WHERE id = @id AND is_completed = FALSE", connection, transaction);
+            command.Parameters.AddWithValue("id", session.Id);
+            command.Parameters.AddWithValue("endTime", session.EndTime.Value);
+            command.Parameters.AddWithValue("duration", (int)Math.Ceiling(session.Duration.TotalMinutes));
+            command.Parameters.AddWithValue("cost", session.TotalCost);
+            command.Parameters.AddWithValue("tariff", session.TariffPerHour);
+            command.Parameters.AddWithValue("oneTimeDiscount", session.OneTimeDiscountPercent);
+            command.Parameters.AddWithValue("personalDiscount", session.PersonalDiscountPercent);
+            command.ExecuteNonQuery();
+            _clientManager.UpdateClientStats(session.ClientId, session.Duration.TotalHours, session.TotalCost, connection, transaction);
             transaction.Commit();
-            LastMessage = "Сеанс закрыт, выручка учтена";
-            return completedSession;
+            session.IsCompleted = true;
+            LastMessage = "Сеанс завершён.";
+            return session;
         }
         catch (Exception ex)
         {
-            LastMessage = "Ошибка базы данных: " + ex.Message;
+            transaction.Rollback();
+            LastMessage = "Ошибка завершения сеанса. " + ex.Message;
             return null;
         }
     }
 
     public List<Session> GetActiveSessions()
     {
-        using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT s.Id, s.ClientId, c.FullName, s.ComputerNumber, s.StartTime, s.PlannedEndTime,
-                   s.EndTime, s.DurationMinutes, s.TotalCost, s.TariffPerHour,
-                   s.OneTimeDiscountPercent, s.PersonalDiscountPercent, s.IsCompleted
-            FROM Sessions s
-            JOIN Clients c ON c.Id = s.ClientId
-            WHERE s.IsCompleted = 0
-            ORDER BY s.PlannedEndTime
-            """;
+        return GetSessions(false, null, null);
+    }
 
-        var sessions = new List<Session>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-            sessions.Add(ReadSession(reader));
-
-        return sessions;
+    public List<Session> GetCompletedSessions(DateTime start, DateTime end)
+    {
+        return GetSessions(true, start, end);
     }
 
     public List<Booking> GetActiveBookings()
     {
+        var result = new List<Booking>();
         using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT b.Id, b.ClientId, c.FullName, b.ComputerNumber, b.PlannedStart, b.DurationMinutes, b.Status
-            FROM Bookings b
-            JOIN Clients c ON c.Id = b.ClientId
-            WHERE b.Status = 'active'
-            ORDER BY b.PlannedStart
-            """;
-
-        var bookings = new List<Booking>();
+        connection.Open();
+        using var command = new NpgsqlCommand(@"
+SELECT b.id, b.client_id, c.full_name, b.computer_number, b.planned_start, b.duration_minutes, b.status
+FROM bookings b
+JOIN clients c ON c.id = b.client_id
+WHERE b.status = 'active'
+ORDER BY b.planned_start", connection);
         using var reader = command.ExecuteReader();
         while (reader.Read())
-            bookings.Add(ReadBooking(reader));
-
-        return bookings;
-    }
-
-    public List<Session> GetCompletedSessionsBetweenDates(DateTime from, DateTime to)
-    {
-        using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT s.Id, s.ClientId, c.FullName, s.ComputerNumber, s.StartTime, s.PlannedEndTime,
-                   s.EndTime, s.DurationMinutes, s.TotalCost, s.TariffPerHour,
-                   s.OneTimeDiscountPercent, s.PersonalDiscountPercent, s.IsCompleted
-            FROM Sessions s
-            JOIN Clients c ON c.Id = s.ClientId
-            WHERE s.IsCompleted = 1 AND s.EndTime >= $from AND s.EndTime <= $to
-            ORDER BY s.EndTime
-            """;
-        command.Parameters.AddWithValue("$from", ToDbDate(from));
-        command.Parameters.AddWithValue("$to", ToDbDate(to));
-
-        var sessions = new List<Session>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-            sessions.Add(ReadSession(reader));
-
-        return sessions;
-    }
-
-    private Session PrepareCompletedSession(Session session, DateTime endTime)
-    {
-        if (endTime < session.StartTime)
-            endTime = session.StartTime;
-
-        var duration = endTime - session.StartTime;
-        if (duration.TotalMinutes < 1)
-            duration = TimeSpan.FromMinutes(1);
-
-        session.EndTime = endTime;
-        session.Duration = duration;
-        session.IsCompleted = true;
-        _tariffManager.CalculateSessionCost(session);
-        return session;
-    }
-
-    private Session InsertActiveSession(SqliteConnection connection, SqliteTransaction transaction, int clientId, int computerNumber, DateTime start, TimeSpan duration, int? bookingId)
-    {
-        var plannedEnd = start.Add(duration);
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            INSERT INTO Sessions(ClientId, ComputerNumber, StartTime, PlannedEndTime, EndTime, DurationMinutes,
-                                 TotalCost, TariffPerHour, OneTimeDiscountPercent, PersonalDiscountPercent, IsCompleted, BookingId)
-            VALUES ($clientId, $computer, $start, $plannedEnd, NULL, 0, 0, 0, 0, 0, 0, $bookingId)
-            RETURNING Id
-            """;
-        command.Parameters.AddWithValue("$clientId", clientId);
-        command.Parameters.AddWithValue("$computer", computerNumber);
-        command.Parameters.AddWithValue("$start", ToDbDate(start));
-        command.Parameters.AddWithValue("$plannedEnd", ToDbDate(plannedEnd));
-        command.Parameters.AddWithValue("$bookingId", bookingId.HasValue ? (object)bookingId.Value : DBNull.Value);
-
-        var id = Convert.ToInt32(command.ExecuteScalar());
-        return new Session
         {
-            Id = id,
-            ClientId = clientId,
-            ComputerNumber = computerNumber,
-            StartTime = start,
-            PlannedEndTime = plannedEnd,
-            IsCompleted = false
-        };
-    }
-
-    private bool IsTimeSlotAvailable(SqliteConnection connection, SqliteTransaction? transaction, DateTime start, TimeSpan duration, int computerNumber, int? ignoreBookingId, int? ignoreSessionId)
-    {
-        if (duration.TotalMinutes <= 0)
-            return false;
-
-        var end = start.Add(duration);
-
-        using (var command = connection.CreateCommand())
-        {
-            command.Transaction = transaction;
-            command.CommandText = "SELECT Id, PlannedStart, DurationMinutes FROM Bookings WHERE Status = 'active' AND ComputerNumber = $computer";
-            command.Parameters.AddWithValue("$computer", computerNumber);
-
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                var id = reader.GetInt32(0);
-                if (ignoreBookingId.HasValue && ignoreBookingId.Value == id)
-                    continue;
-
-                var oldStart = ParseDbDate(reader.GetString(1));
-                var oldEnd = oldStart.Add(TimeSpan.FromMinutes(reader.GetInt32(2)));
-                if (IntervalsOverlap(start, end, oldStart, oldEnd))
-                    return false;
-            }
+            result.Add(ReadBooking(reader));
         }
-
-        using (var command = connection.CreateCommand())
-        {
-            command.Transaction = transaction;
-            command.CommandText = "SELECT Id, StartTime, PlannedEndTime FROM Sessions WHERE IsCompleted = 0 AND ComputerNumber = $computer";
-            command.Parameters.AddWithValue("$computer", computerNumber);
-
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                var id = reader.GetInt32(0);
-                if (ignoreSessionId.HasValue && ignoreSessionId.Value == id)
-                    continue;
-
-                var oldStart = ParseDbDate(reader.GetString(1));
-                var oldEnd = ParseDbDate(reader.GetString(2));
-                if (IntervalsOverlap(start, end, oldStart, oldEnd))
-                    return false;
-            }
-        }
-
-        return true;
-    }
-
-    private bool SetMessage(bool result, string message)
-    {
-        LastMessage = message;
         return result;
     }
 
-    private static bool IntervalsOverlap(DateTime start1, DateTime end1, DateTime start2, DateTime end2)
+    private bool ValidateClientComputerDuration(int clientId, int computerNumber, TimeSpan duration)
     {
-        return start1 < end2 && start2 < end1;
+        if (clientId <= 0)
+        {
+            LastMessage = "Клиент не выбран.";
+            return false;
+        }
+        if (computerNumber <= 0)
+        {
+            LastMessage = "Компьютер не выбран.";
+            return false;
+        }
+        if (duration.TotalMinutes <= 0)
+        {
+            LastMessage = "Длительность должна быть больше нуля.";
+            return false;
+        }
+        return true;
     }
 
-    private static bool ClientHasActiveSession(SqliteConnection connection, SqliteTransaction? transaction, int clientId)
+    private bool IsTimeSlotAvailable(DateTime start, TimeSpan duration, int computerNumber, NpgsqlConnection connection, NpgsqlTransaction? transaction, int ignoreSessionId, int ignoreBookingId)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT COUNT(*) FROM Sessions WHERE ClientId = $clientId AND IsCompleted = 0";
-        command.Parameters.AddWithValue("$clientId", clientId);
+        var end = start.Add(duration);
+        using var sessionCommand = new NpgsqlCommand(@"
+SELECT id, start_time, planned_end_time
+FROM sessions
+WHERE computer_number = @computerNumber AND is_completed = FALSE", connection, transaction);
+        sessionCommand.Parameters.AddWithValue("computerNumber", computerNumber);
+        using (var reader = sessionCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var id = reader.GetInt32(0);
+                if (id == ignoreSessionId)
+                {
+                    continue;
+                }
+                var existingStart = reader.GetDateTime(1);
+                var existingEnd = reader.GetDateTime(2);
+                if (start < existingEnd && existingStart < end)
+                {
+                    return false;
+                }
+            }
+        }
+        using var bookingCommand = new NpgsqlCommand(@"
+SELECT id, planned_start, duration_minutes
+FROM bookings
+WHERE computer_number = @computerNumber AND status = 'active'", connection, transaction);
+        bookingCommand.Parameters.AddWithValue("computerNumber", computerNumber);
+        using (var reader = bookingCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var id = reader.GetInt32(0);
+                if (id == ignoreBookingId)
+                {
+                    continue;
+                }
+                var existingStart = reader.GetDateTime(1);
+                var existingEnd = existingStart.AddMinutes(reader.GetInt32(2));
+                if (start < existingEnd && existingStart < end)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private bool ClientExists(int clientId, NpgsqlConnection connection, NpgsqlTransaction? transaction)
+    {
+        using var command = new NpgsqlCommand("SELECT COUNT(*) FROM clients WHERE id = @id", connection, transaction);
+        command.Parameters.AddWithValue("id", clientId);
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
-    private static bool ComputerExists(SqliteConnection connection, SqliteTransaction? transaction, int computerNumber)
+    private bool ComputerExists(int computerNumber, NpgsqlConnection connection, NpgsqlTransaction? transaction)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT COUNT(*) FROM Computers WHERE Number = $number AND IsActive = 1";
-        command.Parameters.AddWithValue("$number", computerNumber);
+        using var command = new NpgsqlCommand("SELECT COUNT(*) FROM computers WHERE number = @number AND is_active = TRUE", connection, transaction);
+        command.Parameters.AddWithValue("number", computerNumber);
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
-    private Booking? GetBookingById(SqliteConnection connection, SqliteTransaction? transaction, int bookingId)
+    private bool ClientHasActiveSession(int clientId, NpgsqlConnection connection, NpgsqlTransaction? transaction)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            SELECT b.Id, b.ClientId, c.FullName, b.ComputerNumber, b.PlannedStart, b.DurationMinutes, b.Status
-            FROM Bookings b
-            JOIN Clients c ON c.Id = b.ClientId
-            WHERE b.Id = $id
-            """;
-        command.Parameters.AddWithValue("$id", bookingId);
+        using var command = new NpgsqlCommand("SELECT COUNT(*) FROM sessions WHERE client_id = @id AND is_completed = FALSE", connection, transaction);
+        command.Parameters.AddWithValue("id", clientId);
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
+    }
 
+    private Session InsertSession(int clientId, int computerNumber, DateTime start, TimeSpan duration, NpgsqlConnection connection, NpgsqlTransaction transaction)
+    {
+        using var command = new NpgsqlCommand(@"
+INSERT INTO sessions(client_id, computer_number, start_time, planned_end_time, duration_minutes, is_completed)
+VALUES (@clientId, @computerNumber, @start, @plannedEnd, 0, FALSE)
+RETURNING id", connection, transaction);
+        command.Parameters.AddWithValue("clientId", clientId);
+        command.Parameters.AddWithValue("computerNumber", computerNumber);
+        command.Parameters.AddWithValue("start", start);
+        command.Parameters.AddWithValue("plannedEnd", start.Add(duration));
+        var id = Convert.ToInt32(command.ExecuteScalar());
+        return GetSessionById(id, connection, transaction) ?? new Session();
+    }
+
+    private Booking? GetBookingById(int bookingId, NpgsqlConnection connection, NpgsqlTransaction? transaction)
+    {
+        using var command = new NpgsqlCommand(@"
+SELECT b.id, b.client_id, c.full_name, b.computer_number, b.planned_start, b.duration_minutes, b.status
+FROM bookings b
+JOIN clients c ON c.id = b.client_id
+WHERE b.id = @id", connection, transaction);
+        command.Parameters.AddWithValue("id", bookingId);
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadBooking(reader) : null;
     }
 
-    private Session? GetSessionById(SqliteConnection connection, SqliteTransaction? transaction, int sessionId)
+    private Session? GetSessionById(int sessionId, NpgsqlConnection connection, NpgsqlTransaction? transaction)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            SELECT s.Id, s.ClientId, c.FullName, s.ComputerNumber, s.StartTime, s.PlannedEndTime,
-                   s.EndTime, s.DurationMinutes, s.TotalCost, s.TariffPerHour,
-                   s.OneTimeDiscountPercent, s.PersonalDiscountPercent, s.IsCompleted
-            FROM Sessions s
-            JOIN Clients c ON c.Id = s.ClientId
-            WHERE s.Id = $id
-            """;
-        command.Parameters.AddWithValue("$id", sessionId);
-
+        using var command = new NpgsqlCommand(@"
+SELECT s.id, s.client_id, c.full_name, s.computer_number, s.start_time, s.planned_end_time,
+       s.end_time, s.duration_minutes, s.total_cost, s.tariff_per_hour,
+       s.one_time_discount_percent, s.personal_discount_percent, s.is_completed
+FROM sessions s
+JOIN clients c ON c.id = s.client_id
+WHERE s.id = @id", connection, transaction);
+        command.Parameters.AddWithValue("id", sessionId);
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadSession(reader) : null;
     }
 
-    private static Booking ReadBooking(SqliteDataReader reader)
+    private List<Session> GetSessions(bool completed, DateTime? start, DateTime? end)
+    {
+        var result = new List<Session>();
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        var sql = @"
+SELECT s.id, s.client_id, c.full_name, s.computer_number, s.start_time, s.planned_end_time,
+       s.end_time, s.duration_minutes, s.total_cost, s.tariff_per_hour,
+       s.one_time_discount_percent, s.personal_discount_percent, s.is_completed
+FROM sessions s
+JOIN clients c ON c.id = s.client_id
+WHERE s.is_completed = @completed";
+        if (completed && start.HasValue && end.HasValue)
+        {
+            sql += " AND s.end_time >= @start AND s.end_time < @end";
+        }
+        sql += completed ? " ORDER BY s.end_time" : " ORDER BY s.start_time";
+        using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("completed", completed);
+        if (completed && start.HasValue && end.HasValue)
+        {
+            command.Parameters.AddWithValue("start", start.Value);
+            command.Parameters.AddWithValue("end", end.Value);
+        }
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(ReadSession(reader));
+        }
+        return result;
+    }
+
+    private static Booking ReadBooking(NpgsqlDataReader reader)
     {
         return new Booking
         {
@@ -549,45 +530,29 @@ public class SessionManager
             ClientId = reader.GetInt32(1),
             ClientName = reader.GetString(2),
             ComputerNumber = reader.GetInt32(3),
-            PlannedStart = ParseDbDate(reader.GetString(4)),
+            PlannedStart = reader.GetDateTime(4),
             Duration = TimeSpan.FromMinutes(reader.GetInt32(5)),
             Status = reader.GetString(6)
         };
     }
 
-    private static Session ReadSession(SqliteDataReader reader)
+    private static Session ReadSession(NpgsqlDataReader reader)
     {
-        var endTimeText = reader.IsDBNull(6) ? null : reader.GetString(6);
         return new Session
         {
             Id = reader.GetInt32(0),
             ClientId = reader.GetInt32(1),
             ClientName = reader.GetString(2),
             ComputerNumber = reader.GetInt32(3),
-            StartTime = ParseDbDate(reader.GetString(4)),
-            PlannedEndTime = ParseDbDate(reader.GetString(5)),
-            EndTime = string.IsNullOrWhiteSpace(endTimeText) ? null : ParseDbDate(endTimeText),
-            Duration = TimeSpan.FromMinutes(Convert.ToInt32(reader.GetValue(7), CultureInfo.InvariantCulture)),
-            TotalCost = Convert.ToDecimal(reader.GetValue(8), CultureInfo.InvariantCulture),
-            TariffPerHour = Convert.ToDecimal(reader.GetValue(9), CultureInfo.InvariantCulture),
-            OneTimeDiscountPercent = Convert.ToDecimal(reader.GetValue(10), CultureInfo.InvariantCulture),
-            PersonalDiscountPercent = Convert.ToDecimal(reader.GetValue(11), CultureInfo.InvariantCulture),
-            IsCompleted = Convert.ToInt32(reader.GetValue(12), CultureInfo.InvariantCulture) == 1
+            StartTime = reader.GetDateTime(4),
+            PlannedEndTime = reader.GetDateTime(5),
+            EndTime = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+            Duration = TimeSpan.FromMinutes(reader.GetInt32(7)),
+            TotalCost = reader.GetDecimal(8),
+            TariffPerHour = reader.GetDecimal(9),
+            OneTimeDiscountPercent = reader.GetDecimal(10),
+            PersonalDiscountPercent = reader.GetDecimal(11),
+            IsCompleted = reader.GetBoolean(12)
         };
-    }
-
-    private static int ToMinutes(TimeSpan duration)
-    {
-        return Math.Max(1, (int)Math.Ceiling(duration.TotalMinutes));
-    }
-
-    private static string ToDbDate(DateTime value)
-    {
-        return value.ToString("O", CultureInfo.InvariantCulture);
-    }
-
-    private static DateTime ParseDbDate(string value)
-    {
-        return DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
     }
 }
