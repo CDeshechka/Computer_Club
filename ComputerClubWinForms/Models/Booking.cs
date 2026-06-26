@@ -8,7 +8,6 @@ public class Booking
     public int ComputerNumber { get; set; }
     public DateTime PlannedStart { get; set; }
     public TimeSpan Duration { get; set; }
-    public string Status { get; set; } = "active";
-
+    public string Status { get; set; } = string.Empty;
     public DateTime PlannedEnd => PlannedStart.Add(Duration);
 }

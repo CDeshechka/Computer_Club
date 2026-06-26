@@ -1,96 +1,97 @@
-#nullable enable
-
-namespace ComputerClubWinForms.Forms;
-
-partial class ComparePeriodDialog
+namespace ComputerClubWinForms.Forms
 {
-    private Label _startLabel = null!;
-    private Label _endLabel = null!;
-    private DateTimePicker _dtpOtherStart = null!;
-    private DateTimePicker _dtpOtherEnd = null!;
-    private Button _btnOk = null!;
-    private Button _btnCancel = null!;
-
-    private void InitializeComponent()
+    partial class ComparePeriodDialog
     {
-        _startLabel = new Label();
-        _endLabel = new Label();
-        _dtpOtherStart = new DateTimePicker();
-        _dtpOtherEnd = new DateTimePicker();
-        _btnOk = new Button();
-        _btnCancel = new Button();
-        SuspendLayout();
+        private System.ComponentModel.IContainer? components = null;
+        private System.Windows.Forms.Label lblStart = null!;
+        private System.Windows.Forms.DateTimePicker dateStart = null!;
+        private System.Windows.Forms.Label lblEnd = null!;
+        private System.Windows.Forms.DateTimePicker dateEnd = null!;
+        private System.Windows.Forms.Button btnOk = null!;
+        private System.Windows.Forms.Button btnCancel = null!;
+        private System.Windows.Forms.Label lblMessage = null!;
 
-        _startLabel.AutoSize = true;
-        _startLabel.Location = new Point(26, 28);
-        _startLabel.Name = "_startLabel";
-        _startLabel.Size = new Size(47, 15);
-        _startLabel.TabIndex = 0;
-        _startLabel.Text = "Начало";
-
-        _dtpOtherStart.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        _dtpOtherStart.Format = DateTimePickerFormat.Short;
-        _dtpOtherStart.Location = new Point(155, 24);
-        _dtpOtherStart.Name = "_dtpOtherStart";
-        _dtpOtherStart.Size = new Size(264, 23);
-        _dtpOtherStart.TabIndex = 1;
-        _dtpOtherStart.Value = new DateTime(2026, 5, 1, 0, 0, 0, 0);
-
-        _endLabel.AutoSize = true;
-        _endLabel.Location = new Point(26, 64);
-        _endLabel.Name = "_endLabel";
-        _endLabel.Size = new Size(69, 15);
-        _endLabel.TabIndex = 2;
-        _endLabel.Text = "Окончание";
-
-        _dtpOtherEnd.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        _dtpOtherEnd.Format = DateTimePickerFormat.Short;
-        _dtpOtherEnd.Location = new Point(155, 60);
-        _dtpOtherEnd.Name = "_dtpOtherEnd";
-        _dtpOtherEnd.Size = new Size(264, 23);
-        _dtpOtherEnd.TabIndex = 3;
-        _dtpOtherEnd.Value = new DateTime(2026, 5, 7, 0, 0, 0, 0);
-
-        _btnOk.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        _btnOk.Location = new Point(196, 132);
-        _btnOk.Name = "_btnOk";
-        _btnOk.Size = new Size(108, 27);
-        _btnOk.TabIndex = 4;
-        _btnOk.Text = "Сравнить";
-        _btnOk.UseVisualStyleBackColor = true;
-        _btnOk.Click += OnOkClick;
-
-        _btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        _btnCancel.DialogResult = DialogResult.Cancel;
-        _btnCancel.Location = new Point(310, 132);
-        _btnCancel.Name = "_btnCancel";
-        _btnCancel.Size = new Size(108, 27);
-        _btnCancel.TabIndex = 5;
-        _btnCancel.Text = "Отмена";
-        _btnCancel.UseVisualStyleBackColor = true;
-
-        AcceptButton = _btnOk;
-        AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
-        CancelButton = _btnCancel;
-        ClientSize = new Size(444, 184);
-        Controls.AddRange(new Control[]
+        protected override void Dispose(bool disposing)
         {
-            _startLabel,
-            _dtpOtherStart,
-            _endLabel,
-            _dtpOtherEnd,
-            _btnOk,
-            _btnCancel
-        });
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        MinimumSize = new Size(460, 223);
-        Name = "ComparePeriodDialog";
-        StartPosition = FormStartPosition.CenterParent;
-        Text = "Сравнение с другим периодом";
-        ResumeLayout(false);
-        PerformLayout();
+            if (disposing && components != null)
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.lblStart = new System.Windows.Forms.Label();
+            this.dateStart = new System.Windows.Forms.DateTimePicker();
+            this.lblEnd = new System.Windows.Forms.Label();
+            this.dateEnd = new System.Windows.Forms.DateTimePicker();
+            this.btnOk = new System.Windows.Forms.Button();
+            this.btnCancel = new System.Windows.Forms.Button();
+            this.lblMessage = new System.Windows.Forms.Label();
+            this.SuspendLayout();
+            this.lblStart.AutoSize = true;
+            this.lblStart.Location = new System.Drawing.Point(24, 30);
+            this.lblStart.Name = "lblStart";
+            this.lblStart.Size = new System.Drawing.Size(56, 19);
+            this.lblStart.TabIndex = 0;
+            this.lblStart.Text = "Начало";
+            this.dateStart.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dateStart.Location = new System.Drawing.Point(130, 26);
+            this.dateStart.Name = "dateStart";
+            this.dateStart.Size = new System.Drawing.Size(170, 25);
+            this.dateStart.TabIndex = 1;
+            this.lblEnd.AutoSize = true;
+            this.lblEnd.Location = new System.Drawing.Point(24, 76);
+            this.lblEnd.Name = "lblEnd";
+            this.lblEnd.Size = new System.Drawing.Size(48, 19);
+            this.lblEnd.TabIndex = 2;
+            this.lblEnd.Text = "Конец";
+            this.dateEnd.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dateEnd.Location = new System.Drawing.Point(130, 72);
+            this.dateEnd.Name = "dateEnd";
+            this.dateEnd.Size = new System.Drawing.Size(170, 25);
+            this.dateEnd.TabIndex = 3;
+            this.btnOk.Location = new System.Drawing.Point(130, 116);
+            this.btnOk.Name = "btnOk";
+            this.btnOk.Size = new System.Drawing.Size(80, 32);
+            this.btnOk.TabIndex = 4;
+            this.btnOk.Text = "ОК";
+            this.btnOk.UseVisualStyleBackColor = true;
+            this.btnOk.Click += new System.EventHandler(this.OnOkClick);
+            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnCancel.Location = new System.Drawing.Point(220, 116);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(80, 32);
+            this.btnCancel.TabIndex = 5;
+            this.btnCancel.Text = "Отмена";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            this.lblMessage.ForeColor = System.Drawing.Color.DarkRed;
+            this.lblMessage.Location = new System.Drawing.Point(24, 154);
+            this.lblMessage.Name = "lblMessage";
+            this.lblMessage.Size = new System.Drawing.Size(276, 26);
+            this.lblMessage.TabIndex = 6;
+            this.AcceptButton = this.btnOk;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.CancelButton = this.btnCancel;
+            this.ClientSize = new System.Drawing.Size(360, 190);
+            this.Controls.Add(this.lblStart);
+            this.Controls.Add(this.dateStart);
+            this.Controls.Add(this.lblEnd);
+            this.Controls.Add(this.dateEnd);
+            this.Controls.Add(this.btnOk);
+            this.Controls.Add(this.btnCancel);
+            this.Controls.Add(this.lblMessage);
+            this.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.Name = "ComparePeriodDialog";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "Период сравнения";
+            this.ResumeLayout(false);
+            this.PerformLayout();
+        }
     }
 }

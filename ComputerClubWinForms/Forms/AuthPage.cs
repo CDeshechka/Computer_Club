@@ -1,6 +1,5 @@
 using ComputerClubWinForms.Data;
 using ComputerClubWinForms.Managers;
-using ComputerClubWinForms.Models;
 
 namespace ComputerClubWinForms.Forms;
 
@@ -22,47 +21,41 @@ public partial class AuthPage : Form
 
     private void OnLoginClick(object? sender, EventArgs e)
     {
-        _errorLabel.Text = string.Empty;
-
-        if (_userManager is null || _db is null)
+        if (_db == null || _userManager == null)
         {
-            ShowError("Форма открыта в конструкторе Visual Studio. Запустите приложение для входа в систему.");
+            ShowMessage("Форма открыта в режиме конструктора.", false);
             return;
         }
 
-        var user = _userManager.Login(_usernameTextBox.Text, _passwordTextBox.Text);
-        if (user is null)
+        var user = _userManager.Login(txtUsername.Text, txtPassword.Text);
+        if (user == null)
         {
-            ShowError(_userManager.LastMessage);
+            ShowMessage(_userManager.LastMessage, false);
             return;
         }
-
-        OpenMainForm(user);
-    }
-
-    private void OpenMainForm(User user)
-    {
         Hide();
-
-        var mainForm = new MainForm(_db!, user);
-        mainForm.FormClosed += (_, _) =>
-        {
-            if (mainForm.IsLogoutRequested)
-            {
-                _passwordTextBox.Clear();
-                _usernameTextBox.Focus();
-                Show();
-            }
-            else
-            {
-                Close();
-            }
-        };
-        mainForm.Show();
+        using var mainForm = new MainForm(_db, user);
+        mainForm.ShowDialog();
+        Show();
+        txtPassword.Clear();
+        txtPassword.Focus();
     }
 
-    private void ShowError(string message)
+    private void OnSettingsClick(object? sender, EventArgs e)
     {
-        _errorLabel.Text = message;
+        if (_db == null)
+        {
+            ShowMessage("Настройки доступны после запуска приложения.", false);
+            return;
+        }
+
+        using var dialog = new DatabaseSettingsDialog(_db);
+        dialog.ShowDialog(this);
+    }
+
+    private void ShowMessage(string message, bool success)
+    {
+        lblMessage.ForeColor = success ? Color.DarkGreen : Color.DarkRed;
+        lblMessage.Text = message;
     }
 }

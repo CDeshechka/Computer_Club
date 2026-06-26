@@ -1,177 +1,130 @@
-#nullable enable
-
-namespace ComputerClubWinForms.Forms;
-
-partial class MainForm
+namespace ComputerClubWinForms.Forms
 {
-    private Panel _headerPanel = null!;
-    private Label _currentUserLabel = null!;
-    private Button _logoutButton = null!;
-    private TabControl _mainTabControl = null!;
-    private TabPage _tabClients = null!;
-    private TabPage _tabSessions = null!;
-    private TabPage _tabReports = null!;
-    private TabPage _tabSettings = null!;
-    private Label _sessionsPlaceholderLabel = null!;
-    private Label _reportsPlaceholderLabel = null!;
-    private Label _settingsPlaceholderLabel = null!;
-
-    private void InitializeComponent()
+    partial class MainForm
     {
-        _headerPanel = new Panel();
-        _currentUserLabel = new Label();
-        _logoutButton = new Button();
-        _mainTabControl = new TabControl();
-        _tabClients = new TabPage();
-        _tabSessions = new TabPage();
-        _sessionsPlaceholderLabel = new Label();
-        _tabReports = new TabPage();
-        _reportsPlaceholderLabel = new Label();
-        _tabSettings = new TabPage();
-        _settingsPlaceholderLabel = new Label();
-        _headerPanel.SuspendLayout();
-        _mainTabControl.SuspendLayout();
-        _tabSessions.SuspendLayout();
-        _tabReports.SuspendLayout();
-        _tabSettings.SuspendLayout();
-        SuspendLayout();
-        // 
-        // _headerPanel
-        // 
-        _headerPanel.Controls.Add(_currentUserLabel);
-        _headerPanel.Controls.Add(_logoutButton);
-        _headerPanel.Dock = DockStyle.Top;
-        _headerPanel.Location = new Point(0, 0);
-        _headerPanel.Name = "_headerPanel";
-        _headerPanel.Padding = new Padding(14, 8, 14, 8);
-        _headerPanel.Size = new Size(1100, 48);
-        _headerPanel.TabIndex = 0;
-        // 
-        // _currentUserLabel
-        // 
-        _currentUserLabel.AutoSize = true;
-        _currentUserLabel.Location = new Point(14, 16);
-        _currentUserLabel.Name = "_currentUserLabel";
-        _currentUserLabel.Size = new Size(332, 15);
-        _currentUserLabel.TabIndex = 0;
-        _currentUserLabel.Text = "Пользователь: admin | Роль: admin (пример конструктора)";
-        _currentUserLabel.TextAlign = ContentAlignment.MiddleLeft;
-        // 
-        // _logoutButton
-        // 
-        _logoutButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        _logoutButton.Location = new Point(976, 10);
-        _logoutButton.Name = "_logoutButton";
-        _logoutButton.Size = new Size(110, 28);
-        _logoutButton.TabIndex = 1;
-        _logoutButton.Text = "Выйти";
-        _logoutButton.UseVisualStyleBackColor = true;
-        _logoutButton.Click += OnLogoutClick;
-        // 
-        // _mainTabControl
-        // 
-        _mainTabControl.Controls.Add(_tabClients);
-        _mainTabControl.Controls.Add(_tabSessions);
-        _mainTabControl.Controls.Add(_tabReports);
-        _mainTabControl.Controls.Add(_tabSettings);
-        _mainTabControl.Dock = DockStyle.Fill;
-        _mainTabControl.Location = new Point(0, 48);
-        _mainTabControl.Name = "_mainTabControl";
-        _mainTabControl.SelectedIndex = 0;
-        _mainTabControl.Size = new Size(1100, 672);
-        _mainTabControl.TabIndex = 1;
-        // 
-        // _tabClients
-        // 
-        _tabClients.Location = new Point(4, 24);
-        _tabClients.Name = "_tabClients";
-        _tabClients.Padding = new Padding(12);
-        _tabClients.Size = new Size(1092, 644);
-        _tabClients.TabIndex = 0;
-        _tabClients.Text = "Клиенты";
-        _tabClients.UseVisualStyleBackColor = true;
-        // 
-        // _tabSessions
-        // 
-        _tabSessions.Controls.Add(_sessionsPlaceholderLabel);
-        _tabSessions.Location = new Point(4, 24);
-        _tabSessions.Name = "_tabSessions";
-        _tabSessions.Padding = new Padding(12);
-        _tabSessions.Size = new Size(1092, 644);
-        _tabSessions.TabIndex = 1;
-        _tabSessions.Text = "Сеансы";
-        _tabSessions.UseVisualStyleBackColor = true;
-        // 
-        // _sessionsPlaceholderLabel
-        // 
-        _sessionsPlaceholderLabel.AutoSize = true;
-        _sessionsPlaceholderLabel.Location = new Point(12, 12);
-        _sessionsPlaceholderLabel.Name = "_sessionsPlaceholderLabel";
-        _sessionsPlaceholderLabel.Size = new Size(520, 15);
-        _sessionsPlaceholderLabel.TabIndex = 0;
-        _sessionsPlaceholderLabel.Text = "Во время запуска сюда подставляется SessionPage. Отдельно её можно открыть в дизайнере.";
-        // 
-        // _tabReports
-        // 
-        _tabReports.Controls.Add(_reportsPlaceholderLabel);
-        _tabReports.Location = new Point(4, 24);
-        _tabReports.Name = "_tabReports";
-        _tabReports.Padding = new Padding(12);
-        _tabReports.Size = new Size(1092, 644);
-        _tabReports.TabIndex = 2;
-        _tabReports.Text = "Отчёты";
-        _tabReports.UseVisualStyleBackColor = true;
-        // 
-        // _reportsPlaceholderLabel
-        // 
-        _reportsPlaceholderLabel.AutoSize = true;
-        _reportsPlaceholderLabel.Location = new Point(12, 12);
-        _reportsPlaceholderLabel.Name = "_reportsPlaceholderLabel";
-        _reportsPlaceholderLabel.Size = new Size(516, 15);
-        _reportsPlaceholderLabel.TabIndex = 0;
-        _reportsPlaceholderLabel.Text = "Во время запуска сюда подставляется ReportPage. Отдельно её можно открыть в дизайнере.";
-        // 
-        // _tabSettings
-        // 
-        _tabSettings.Controls.Add(_settingsPlaceholderLabel);
-        _tabSettings.Location = new Point(4, 24);
-        _tabSettings.Name = "_tabSettings";
-        _tabSettings.Padding = new Padding(12);
-        _tabSettings.Size = new Size(1092, 644);
-        _tabSettings.TabIndex = 3;
-        _tabSettings.Text = "Настройки";
-        _tabSettings.UseVisualStyleBackColor = true;
-        // 
-        // _settingsPlaceholderLabel
-        // 
-        _settingsPlaceholderLabel.AutoSize = true;
-        _settingsPlaceholderLabel.Location = new Point(12, 12);
-        _settingsPlaceholderLabel.Name = "_settingsPlaceholderLabel";
-        _settingsPlaceholderLabel.Size = new Size(523, 15);
-        _settingsPlaceholderLabel.TabIndex = 0;
-        _settingsPlaceholderLabel.Text = "Во время запуска сюда подставляется SettingsPage. Отдельно её можно открыть в дизайнере.";
-        // 
-        // MainForm
-        // 
-        AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(1100, 720);
-        Controls.Add(_mainTabControl);
-        Controls.Add(_headerPanel);
-        MinimumSize = new Size(1100, 720);
-        Name = "MainForm";
-        StartPosition = FormStartPosition.CenterScreen;
-        Text = "Компьютерный клуб — управление сеансами";
-        WindowState = FormWindowState.Maximized;
-        _headerPanel.ResumeLayout(false);
-        _headerPanel.PerformLayout();
-        _mainTabControl.ResumeLayout(false);
-        _tabSessions.ResumeLayout(false);
-        _tabSessions.PerformLayout();
-        _tabReports.ResumeLayout(false);
-        _tabReports.PerformLayout();
-        _tabSettings.ResumeLayout(false);
-        _tabSettings.PerformLayout();
-        ResumeLayout(false);
+        private System.ComponentModel.IContainer? components = null;
+        private System.Windows.Forms.TabControl tabControl = null!;
+        private System.Windows.Forms.TabPage tabClients = null!;
+        private System.Windows.Forms.TabPage tabSessions = null!;
+        private System.Windows.Forms.TabPage tabReports = null!;
+        private System.Windows.Forms.TabPage tabSettings = null!;
+        private System.Windows.Forms.Label lblDesignInfoClients = null!;
+        private System.Windows.Forms.Label lblDesignInfoSessions = null!;
+        private System.Windows.Forms.Label lblDesignInfoReports = null!;
+        private System.Windows.Forms.Label lblDesignInfoSettings = null!;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && components != null)
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.tabControl = new System.Windows.Forms.TabControl();
+            this.tabClients = new System.Windows.Forms.TabPage();
+            this.tabSessions = new System.Windows.Forms.TabPage();
+            this.tabReports = new System.Windows.Forms.TabPage();
+            this.tabSettings = new System.Windows.Forms.TabPage();
+            this.lblDesignInfoClients = new System.Windows.Forms.Label();
+            this.lblDesignInfoSessions = new System.Windows.Forms.Label();
+            this.lblDesignInfoReports = new System.Windows.Forms.Label();
+            this.lblDesignInfoSettings = new System.Windows.Forms.Label();
+            this.tabControl.SuspendLayout();
+            this.tabClients.SuspendLayout();
+            this.tabSessions.SuspendLayout();
+            this.tabReports.SuspendLayout();
+            this.tabSettings.SuspendLayout();
+            this.SuspendLayout();
+            this.tabControl.Controls.Add(this.tabClients);
+            this.tabControl.Controls.Add(this.tabSessions);
+            this.tabControl.Controls.Add(this.tabReports);
+            this.tabControl.Controls.Add(this.tabSettings);
+            this.tabControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tabControl.Location = new System.Drawing.Point(0, 0);
+            this.tabControl.Name = "tabControl";
+            this.tabControl.SelectedIndex = 0;
+            this.tabControl.Size = new System.Drawing.Size(1000, 650);
+            this.tabControl.TabIndex = 0;
+            this.tabClients.Controls.Add(this.lblDesignInfoClients);
+            this.tabClients.Location = new System.Drawing.Point(4, 26);
+            this.tabClients.Name = "tabClients";
+            this.tabClients.Padding = new System.Windows.Forms.Padding(3);
+            this.tabClients.Size = new System.Drawing.Size(992, 620);
+            this.tabClients.TabIndex = 0;
+            this.tabClients.Text = "Клиенты";
+            this.tabClients.UseVisualStyleBackColor = true;
+            this.lblDesignInfoClients.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblDesignInfoClients.Location = new System.Drawing.Point(3, 3);
+            this.lblDesignInfoClients.Name = "lblDesignInfoClients";
+            this.lblDesignInfoClients.Size = new System.Drawing.Size(986, 614);
+            this.lblDesignInfoClients.TabIndex = 0;
+            this.lblDesignInfoClients.Text = "Вкладка клиентов создаётся после входа. Отдельный интерфейс редактируется в ClientPage.";
+            this.lblDesignInfoClients.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.tabSessions.Controls.Add(this.lblDesignInfoSessions);
+            this.tabSessions.Location = new System.Drawing.Point(4, 26);
+            this.tabSessions.Name = "tabSessions";
+            this.tabSessions.Padding = new System.Windows.Forms.Padding(3);
+            this.tabSessions.Size = new System.Drawing.Size(992, 620);
+            this.tabSessions.TabIndex = 1;
+            this.tabSessions.Text = "Сеансы";
+            this.tabSessions.UseVisualStyleBackColor = true;
+            this.lblDesignInfoSessions.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblDesignInfoSessions.Location = new System.Drawing.Point(3, 3);
+            this.lblDesignInfoSessions.Name = "lblDesignInfoSessions";
+            this.lblDesignInfoSessions.Size = new System.Drawing.Size(986, 614);
+            this.lblDesignInfoSessions.TabIndex = 0;
+            this.lblDesignInfoSessions.Text = "Вкладка сеансов создаётся после входа. Отдельный интерфейс редактируется в SessionPage.";
+            this.lblDesignInfoSessions.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.tabReports.Controls.Add(this.lblDesignInfoReports);
+            this.tabReports.Location = new System.Drawing.Point(4, 26);
+            this.tabReports.Name = "tabReports";
+            this.tabReports.Padding = new System.Windows.Forms.Padding(3);
+            this.tabReports.Size = new System.Drawing.Size(992, 620);
+            this.tabReports.TabIndex = 2;
+            this.tabReports.Text = "Отчёты";
+            this.tabReports.UseVisualStyleBackColor = true;
+            this.lblDesignInfoReports.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblDesignInfoReports.Location = new System.Drawing.Point(3, 3);
+            this.lblDesignInfoReports.Name = "lblDesignInfoReports";
+            this.lblDesignInfoReports.Size = new System.Drawing.Size(986, 614);
+            this.lblDesignInfoReports.TabIndex = 0;
+            this.lblDesignInfoReports.Text = "Вкладка отчётов создаётся после входа. Отдельный интерфейс редактируется в ReportPage.";
+            this.lblDesignInfoReports.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.tabSettings.Controls.Add(this.lblDesignInfoSettings);
+            this.tabSettings.Location = new System.Drawing.Point(4, 26);
+            this.tabSettings.Name = "tabSettings";
+            this.tabSettings.Padding = new System.Windows.Forms.Padding(3);
+            this.tabSettings.Size = new System.Drawing.Size(992, 620);
+            this.tabSettings.TabIndex = 3;
+            this.tabSettings.Text = "Настройки";
+            this.tabSettings.UseVisualStyleBackColor = true;
+            this.lblDesignInfoSettings.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblDesignInfoSettings.Location = new System.Drawing.Point(3, 3);
+            this.lblDesignInfoSettings.Name = "lblDesignInfoSettings";
+            this.lblDesignInfoSettings.Size = new System.Drawing.Size(986, 614);
+            this.lblDesignInfoSettings.TabIndex = 0;
+            this.lblDesignInfoSettings.Text = "Вкладка настроек создаётся после входа. Отдельный интерфейс редактируется в SettingsPage.";
+            this.lblDesignInfoSettings.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(1000, 650);
+            this.Controls.Add(this.tabControl);
+            this.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.MinimumSize = new System.Drawing.Size(1000, 650);
+            this.Name = "MainForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "Компьютерный клуб";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.tabControl.ResumeLayout(false);
+            this.tabClients.ResumeLayout(false);
+            this.tabSessions.ResumeLayout(false);
+            this.tabReports.ResumeLayout(false);
+            this.tabSettings.ResumeLayout(false);
+            this.ResumeLayout(false);
+        }
     }
 }

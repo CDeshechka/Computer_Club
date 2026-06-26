@@ -7,9 +7,6 @@ namespace ComputerClubWinForms.Forms;
 public partial class MainForm : Form
 {
     private DatabaseHelper? _db;
-
-    public bool IsLogoutRequested { get; private set; }
-
     public MainForm()
     {
         InitializeComponent();
@@ -23,49 +20,31 @@ public partial class MainForm : Form
 
     public void InitializeAfterLogin(User user)
     {
-        if (_db is null)
+        if (_db == null)
+        {
             return;
+        }
 
-        _currentUserLabel.Text = $"Пользователь: {user.Username} | Роль: {user.Role}";
-        _mainTabControl.TabPages.Clear();
-
+        Text = "Компьютерный клуб - " + user.Username + " (" + user.Role + ")";
         var clientManager = new ClientManager(_db);
         var tariffManager = new TariffManager(_db, clientManager);
         var sessionManager = new SessionManager(_db, clientManager, tariffManager);
         var analyticsManager = new AnalyticsManager(sessionManager);
-
-        var clientPage = new ClientPage(clientManager);
-        var sessionPage = new SessionPage(clientManager, sessionManager);
-
-        clientPage.ClientsChanged += (_, _) => sessionPage.ReloadClients();
-
-        _mainTabControl.TabPages.Add(CreateRuntimeTab("Клиенты", clientPage));
-        _mainTabControl.TabPages.Add(CreateRuntimeTab("Сеансы", sessionPage));
-
+        tabControl.TabPages.Clear();
+        tabControl.TabPages.Add(CreatePage("Клиенты", new ClientPage(clientManager)));
+        tabControl.TabPages.Add(CreatePage("Сеансы", new SessionPage(clientManager, sessionManager)));
         if (user.IsAdmin)
         {
-            _mainTabControl.TabPages.Add(CreateRuntimeTab("Отчёты", new ReportPage(analyticsManager)));
-            _mainTabControl.TabPages.Add(CreateRuntimeTab("Настройки", new SettingsPage(tariffManager)));
+            tabControl.TabPages.Add(CreatePage("Отчёты", new ReportPage(analyticsManager)));
+            tabControl.TabPages.Add(CreatePage("Настройки", new SettingsPage(tariffManager, _db)));
         }
     }
 
-    public void SwitchToPage(int index)
+    private static TabPage CreatePage(string title, Control control)
     {
-        if (index >= 0 && index < _mainTabControl.TabPages.Count)
-            _mainTabControl.SelectedIndex = index;
-    }
-
-    private static TabPage CreateRuntimeTab(string title, Control content)
-    {
-        content.Dock = DockStyle.Fill;
-        var tab = new TabPage(title);
-        tab.Controls.Add(content);
-        return tab;
-    }
-
-    private void OnLogoutClick(object? sender, EventArgs e)
-    {
-        IsLogoutRequested = true;
-        Close();
+        control.Dock = DockStyle.Fill;
+        var page = new TabPage(title);
+        page.Controls.Add(control);
+        return page;
     }
 }

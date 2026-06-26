@@ -1,563 +1,350 @@
-using System.ComponentModel;
 using ComputerClubWinForms.Managers;
 using ComputerClubWinForms.Models;
 
-namespace ComputerClubWinForms.Forms
+namespace ComputerClubWinForms.Forms;
+
+public partial class SessionPage : UserControl
 {
-    public partial class SessionPage : UserControl
+    private ClientManager? _clientManager;
+    private SessionManager? _sessionManager;
+    private int _selectedComputerNumber = 1;
+
+    public SessionPage()
     {
-        private ClientManager? _clientManager;
-        private SessionManager? _sessionManager;
-        private bool _isInitialized;
+        InitializeComponent();
+    }
 
-        public SessionPage()
+    public SessionPage(ClientManager clientManager, SessionManager sessionManager) : this()
+    {
+        _clientManager = clientManager;
+        _sessionManager = sessionManager;
+        BuildHallButtons();
+        LoadAllData();
+        refreshTimer.Start();
+    }
+
+    public void ShowActiveSessions(List<Session> sessions)
+    {
+        gridSessions.DataSource = sessions.Select(s => new
         {
-            InitializeComponent();
-            EnsureSessionGridColumns();
+            s.Id,
+            Клиент = s.ClientName,
+            ПК = s.ComputerNumber,
+            Начало = s.StartTime.ToString("dd.MM.yyyy HH:mm"),
+            ПлановоеОкончание = s.PlannedEndTime.ToString("dd.MM.yyyy HH:mm"),
+            Осталось = FormatTime(s.RemainingTime)
+        }).ToList();
+        if (gridSessions.Columns["Id"] != null)
+        {
+            gridSessions.Columns["Id"]!.Visible = false;
+        }
+    }
 
-           
-            if (IsDesignMode())
-                LoadDesignPreview();
+    public void ShowBookings(List<Booking> bookings)
+    {
+        gridBookings.DataSource = bookings.Select(b => new
+        {
+            b.Id,
+            Клиент = b.ClientName,
+            ПК = b.ComputerNumber,
+            Начало = b.PlannedStart.ToString("dd.MM.yyyy HH:mm"),
+            Длительность = FormatTime(b.Duration),
+            Окончание = b.PlannedEnd.ToString("dd.MM.yyyy HH:mm")
+        }).ToList();
+        if (gridBookings.Columns["Id"] != null)
+        {
+            gridBookings.Columns["Id"]!.Visible = false;
+        }
+    }
+
+    private void LoadAllData()
+    {
+        LoadClients();
+        LoadSessionsAndBookings();
+    }
+
+    private void LoadClients()
+    {
+        if (_clientManager == null)
+        {
+            gridClients.DataSource = new List<object>();
+            return;
         }
 
-        public SessionPage(ClientManager clientManager, SessionManager sessionManager) : this()
+        gridClients.DataSource = _clientManager.GetAllClients(txtClientSearch.Text).Select(c => new
         {
-            _clientManager = clientManager;
-            _sessionManager = sessionManager;
-            ClearDesignPreview();
-            Load += SessionPage_Load;
+            c.Id,
+            ФИО = c.FullName,
+            Телефон = c.Phone,
+            Скидка = c.DiscountPercent
+        }).ToList();
+        if (gridClients.Columns["Id"] != null)
+        {
+            gridClients.Columns["Id"]!.Visible = false;
+        }
+    }
+
+    private void LoadSessionsAndBookings()
+    {
+        if (_sessionManager == null)
+        {
+            ShowActiveSessions(new List<Session>());
+            ShowBookings(new List<Booking>());
+            RefreshHall(new List<Session>(), new List<Booking>());
+            return;
         }
 
-        private void SessionPage_Load(object? sender, EventArgs e)
+        var sessions = _sessionManager.GetActiveSessions();
+        var bookings = _sessionManager.GetActiveBookings();
+        ShowActiveSessions(sessions);
+        ShowBookings(bookings);
+        RefreshHall(sessions, bookings);
+    }
+
+    private void BuildHallButtons()
+    {
+        if (_sessionManager == null)
         {
-            InitializeData();
+            return;
         }
 
-        private void InitializeData()
+        hallPanel.Controls.Clear();
+        var computers = _sessionManager.GetComputers();
+        foreach (var computer in computers)
         {
-            if (_isInitialized || _clientManager is null || _sessionManager is null)
-                return;
-
-            _isInitialized = true;
-            ReloadClients();
-            ReloadComputers();
-            RefreshAll();
-            _timer.Start();
-        }
-
-        private void LoadDesignPreview()
-        {
-            var clients = new List<Client>
+            var button = new Button
             {
-                new Client { Id = 1, FullName = "Иванов Иван", Phone = "+7 900 111-22-33" },
-                new Client { Id = 2, FullName = "Петров Пётр", Phone = "+7 900 222-33-44" }
+                Text = computer.Name,
+                Width = 96,
+                Height = 52,
+                Margin = new Padding(10),
+                Tag = computer.Number
             };
-            _cmbClients.DataSource = clients;
-            _cmbClients.DisplayMember = nameof(Client.FullName);
-            _cmbClients.ValueMember = nameof(Client.Id);
+            button.Click += OnComputerClick;
+            hallPanel.Controls.Add(button);
+        }
+    }
 
-            var computers = Enumerable.Range(1, 12)
-                .Select(number => new Computer { Number = number, Name = $"Компьютер №{number}", IsActive = true })
-                .ToList();
-            _cmbComputers.DataSource = computers;
-            _cmbComputers.DisplayMember = nameof(Computer.Number);
-            _cmbComputers.ValueMember = nameof(Computer.Number);
-
-            ShowActiveSessions(new List<Session>
+    private void RefreshHall(List<Session> sessions, List<Booking> bookings)
+    {
+        foreach (Control control in hallPanel.Controls)
+        {
+            if (control is not Button button || button.Tag == null)
             {
-                new Session
-                {
-                    Id = 1,
-                    ClientName = "Иванов Иван",
-                    ComputerNumber = 3,
-                    StartTime = DateTime.Now.AddMinutes(-35),
-                    PlannedEndTime = DateTime.Now.AddMinutes(25)
-                },
-                new Session
-                {
-                    Id = 2,
-                    ClientName = "Петров Пётр",
-                    ComputerNumber = 5,
-                    StartTime = DateTime.Now.AddMinutes(-120),
-                    PlannedEndTime = DateTime.Now.AddMinutes(-5)
-                }
-            });
+                continue;
+            }
+            var number = Convert.ToInt32(button.Tag);
+            var busy = sessions.Any(s => s.ComputerNumber == number) || bookings.Any(b => b.ComputerNumber == number);
+            button.BackColor = busy ? Color.FromArgb(255, 210, 210) : Color.FromArgb(210, 245, 215);
+            button.FlatStyle = number == _selectedComputerNumber ? FlatStyle.Popup : FlatStyle.Standard;
+        }
+        lblSelectedComputer.Text = "Выбран ПК " + _selectedComputerNumber;
+    }
 
-            ShowBookings(new List<Booking>
-            {
-                new Booking
-                {
-                    Id = 1,
-                    ClientName = "Сидоров Сергей",
-                    ComputerNumber = 4,
-                    PlannedStart = DateTime.Today.AddDays(1).AddHours(18),
-                    Duration = TimeSpan.FromMinutes(120)
-                }
-            });
+    private void OnComputerClick(object? sender, EventArgs e)
+    {
+        if (sender is Button button && button.Tag != null)
+        {
+            _selectedComputerNumber = Convert.ToInt32(button.Tag);
+            LoadSessionsAndBookings();
+        }
+    }
 
-            RefreshComputerMap();
+    private void OnClientSearchChanged(object? sender, EventArgs e)
+    {
+        LoadClients();
+    }
+
+    private void OnStartSessionClick(object? sender, EventArgs e)
+    {
+        if (_sessionManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private static bool IsDesignMode()
+        var client = GetSelectedClient();
+        if (client == null)
         {
-            return LicenseManager.UsageMode == LicenseUsageMode.Designtime;
+            ShowMessage("Клиент не выбран.", false);
+            return;
+        }
+        using var dialog = new ExtendSessionDialog("Длительность сеанса, минут", 60);
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        var session = _sessionManager.StartSessionDirect(client.Id, _selectedComputerNumber, DateTime.Now, TimeSpan.FromMinutes(dialog.Minutes));
+        LoadSessionsAndBookings();
+        ShowMessage(_sessionManager.LastMessage, session != null);
+    }
+
+    private void OnCreateBookingClick(object? sender, EventArgs e)
+    {
+        if (_sessionManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private void ClearDesignPreview()
+        var client = GetSelectedClient();
+        if (client == null)
         {
-            _cmbClients.DataSource = null;
-            _cmbComputers.DataSource = null;
-            _gridActiveSessions.DataSource = null;
-            _gridBookings.DataSource = null;
-            _gridActiveSessions.Rows.Clear();
-            _gridBookings.Rows.Clear();
-            _computerMap.Controls.Clear();
+            ShowMessage("Клиент не выбран.", false);
+            return;
+        }
+        using var dialog = new BookingDialog(_selectedComputerNumber);
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        var success = _sessionManager.CreateBooking(client.Id, dialog.ComputerNumber, dialog.PlannedStart, TimeSpan.FromMinutes(dialog.DurationMinutes));
+        LoadSessionsAndBookings();
+        ShowMessage(_sessionManager.LastMessage, success);
+    }
+
+    private void OnStartByBookingClick(object? sender, EventArgs e)
+    {
+        if (_sessionManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private void EnsureSessionGridColumns()
+        var bookingId = GetSelectedBookingId();
+        if (bookingId == null)
         {
-            if (_gridActiveSessions.Columns.Count == 0)
-            {
-                _gridActiveSessions.AutoGenerateColumns = false;
-                _gridActiveSessions.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ActiveSessionRow.Id), DataPropertyName = nameof(ActiveSessionRow.Id), HeaderText = "ID", ReadOnly = true });
-                _gridActiveSessions.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ActiveSessionRow.Client), DataPropertyName = nameof(ActiveSessionRow.Client), HeaderText = "Клиент", ReadOnly = true });
-                _gridActiveSessions.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ActiveSessionRow.Computer), DataPropertyName = nameof(ActiveSessionRow.Computer), HeaderText = "Компьютер", ReadOnly = true });
-                _gridActiveSessions.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ActiveSessionRow.StartTime), DataPropertyName = nameof(ActiveSessionRow.StartTime), HeaderText = "Начало", ReadOnly = true });
-                _gridActiveSessions.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ActiveSessionRow.PlannedEndTime), DataPropertyName = nameof(ActiveSessionRow.PlannedEndTime), HeaderText = "План. окончание", ReadOnly = true });
-                _gridActiveSessions.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(ActiveSessionRow.Remaining), DataPropertyName = nameof(ActiveSessionRow.Remaining), HeaderText = "Осталось", ReadOnly = true });
-                _gridActiveSessions.Columns.Add(new DataGridViewCheckBoxColumn { Name = nameof(ActiveSessionRow.IsExpired), DataPropertyName = nameof(ActiveSessionRow.IsExpired), HeaderText = "Время вышло", ReadOnly = true });
-            }
+            ShowMessage("Бронь не выбрана.", false);
+            return;
+        }
+        var session = _sessionManager.StartSession(bookingId.Value);
+        LoadSessionsAndBookings();
+        ShowMessage(_sessionManager.LastMessage, session != null);
+    }
 
-            if (_gridBookings.Columns.Count == 0)
-            {
-                _gridBookings.AutoGenerateColumns = false;
-                _gridBookings.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(BookingRow.Id), DataPropertyName = nameof(BookingRow.Id), HeaderText = "ID", ReadOnly = true });
-                _gridBookings.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(BookingRow.Client), DataPropertyName = nameof(BookingRow.Client), HeaderText = "Клиент", ReadOnly = true });
-                _gridBookings.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(BookingRow.Computer), DataPropertyName = nameof(BookingRow.Computer), HeaderText = "Компьютер", ReadOnly = true });
-                _gridBookings.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(BookingRow.Start), DataPropertyName = nameof(BookingRow.Start), HeaderText = "Начало", ReadOnly = true });
-                _gridBookings.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(BookingRow.End), DataPropertyName = nameof(BookingRow.End), HeaderText = "Окончание", ReadOnly = true });
-                _gridBookings.Columns.Add(new DataGridViewTextBoxColumn { Name = nameof(BookingRow.DurationMinutes), DataPropertyName = nameof(BookingRow.DurationMinutes), HeaderText = "Минут", ReadOnly = true });
-            }
+    private void OnDeleteBookingClick(object? sender, EventArgs e)
+    {
+        if (_sessionManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        public void ReloadClients()
+        var bookingId = GetSelectedBookingId();
+        if (bookingId == null)
         {
-            if (_clientManager is null)
-                return;
+            ShowMessage("Бронь не выбрана.", false);
+            return;
+        }
+        var success = _sessionManager.DeleteBooking(bookingId.Value);
+        LoadSessionsAndBookings();
+        ShowMessage(_sessionManager.LastMessage, success);
+    }
 
-            var selectedId = SelectedClientId;
-            var clients = _clientManager.GetAllClients();
-            _cmbClients.DataSource = clients;
-            _cmbClients.DisplayMember = nameof(Client.FullName);
-            _cmbClients.ValueMember = nameof(Client.Id);
-
-            if (selectedId.HasValue)
-                _cmbClients.SelectedValue = selectedId.Value;
-
-            _btnStartDirect.Enabled = clients.Count > 0;
-            _btnNewBooking.Enabled = clients.Count > 0;
+    private void OnExtendClick(object? sender, EventArgs e)
+    {
+        if (_sessionManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private void ReloadComputers()
+        var sessionId = GetSelectedSessionId();
+        if (sessionId == null)
         {
-            if (_sessionManager is null)
-                return;
+            ShowMessage("Сеанс не выбран.", false);
+            return;
+        }
+        using var dialog = new ExtendSessionDialog("Добавить минут", 30);
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        var success = _sessionManager.ExtendSession(sessionId.Value, TimeSpan.FromMinutes(dialog.Minutes));
+        LoadSessionsAndBookings();
+        ShowMessage(_sessionManager.LastMessage, success);
+    }
 
-            var computers = _sessionManager.GetComputers();
-            _cmbComputers.DataSource = computers;
-            _cmbComputers.DisplayMember = nameof(Computer.Number);
-            _cmbComputers.ValueMember = nameof(Computer.Number);
+    private void OnCompleteClick(object? sender, EventArgs e)
+    {
+        if (_sessionManager == null)
+        {
+            ShowMessage("Форма открыта в режиме конструктора.", false);
+            return;
         }
 
-        private void RefreshAll()
+        var sessionId = GetSelectedSessionId();
+        if (sessionId == null)
         {
-            RefreshActiveSessions();
-            RefreshBookings();
-            RefreshComputerMap();
+            ShowMessage("Сеанс не выбран.", false);
+            return;
         }
-
-        private void SessionTimer_Tick(object? sender, EventArgs e)
+        var preview = _sessionManager.PreviewCompletion(sessionId.Value);
+        if (preview == null)
         {
-            RefreshActiveSessions();
+            ShowMessage(_sessionManager.LastMessage, false);
+            return;
         }
-
-        private void RefreshActiveSessions()
+        using var receiptDialog = new ReceiptDialog(preview);
+        if (receiptDialog.ShowDialog(this) != DialogResult.OK)
         {
-            if (_sessionManager is null)
-                return;
-
-            try
-            {
-                var sessions = _sessionManager.GetActiveSessions();
-                ShowActiveSessions(sessions);
-                RefreshComputerMap();
-            }
-            catch (Exception ex)
-            {
-                _timer.Stop();
-                MessageBox.Show($"Не удалось обновить список активных сеансов. Проверьте соединение. {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                _timer.Start();
-            }
+            return;
         }
+        var completed = _sessionManager.CompleteSession(sessionId.Value);
+        LoadSessionsAndBookings();
+        ShowMessage(_sessionManager.LastMessage, completed != null);
+    }
 
-        private void RefreshBookings()
+    private void OnRefreshClick(object? sender, EventArgs e)
+    {
+        LoadAllData();
+        ShowMessage("Данные обновлены.", true);
+    }
+
+    private void OnTimerTick(object? sender, EventArgs e)
+    {
+        if (_sessionManager != null)
         {
-            if (_sessionManager is null)
-                return;
-
-            try
-            {
-                ShowBookings(_sessionManager.GetActiveBookings());
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Не удалось обновить список броней: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            LoadSessionsAndBookings();
         }
+    }
 
-        public void ShowActiveSessions(List<Session> sessions)
+    private Client? GetSelectedClient()
+    {
+        if (_clientManager == null || gridClients.CurrentRow == null || gridClients.CurrentRow.Cells["Id"].Value == null)
         {
-            EnsureSessionGridColumns();
-            _gridActiveSessions.DataSource = null;
-            _gridActiveSessions.DataSource = sessions.Select(s => new ActiveSessionRow
-            {
-                Id = s.Id,
-                Client = s.ClientName,
-                Computer = s.ComputerNumber,
-                StartTime = s.StartTime.ToString("dd.MM.yyyy HH:mm"),
-                PlannedEndTime = s.PlannedEndTime.ToString("dd.MM.yyyy HH:mm"),
-                Remaining = FormatTimeSpan(s.RemainingTime),
-                IsExpired = s.RemainingTime.TotalSeconds <= 0
-            }).ToList();
-        }
-
-        public void ShowBookings(List<Booking> bookings)
-        {
-            EnsureSessionGridColumns();
-            _gridBookings.DataSource = null;
-            _gridBookings.DataSource = bookings.Select(b => new BookingRow
-            {
-                Id = b.Id,
-                Client = b.ClientName,
-                Computer = b.ComputerNumber,
-                Start = b.PlannedStart.ToString("dd.MM.yyyy HH:mm"),
-                End = b.PlannedEnd.ToString("dd.MM.yyyy HH:mm"),
-                DurationMinutes = (int)b.Duration.TotalMinutes
-            }).ToList();
-        }
-
-        private void RefreshComputerMap()
-        {
-            _computerMap.SuspendLayout();
-            _computerMap.Controls.Clear();
-
-            var computers = _sessionManager is null
-                ? Enumerable.Range(1, 12).Select(number => new Computer { Number = number, Name = $"Компьютер №{number}", IsActive = true }).ToList()
-                : _sessionManager.GetComputers();
-
-            foreach (var computer in computers)
-            {
-                var isAvailableNow = _sessionManager is null || _sessionManager.IsTimeSlotAvailable(DateTime.Now, TimeSpan.FromMinutes(1), computer.Number);
-                if (_sessionManager is null && (computer.Number == 3 || computer.Number == 5))
-                    isAvailableNow = false;
-
-                const int buttonWidth = 82;
-                const int buttonHeight = 46;
-                const int spacing = 10;
-                const int startOffset = 8;
-
-                var index = _computerMap.Controls.Count;
-                var columns = Math.Max(1, (_computerMap.ClientSize.Width - startOffset) / (buttonWidth + spacing));
-                var row = index / columns;
-                var column = index % columns;
-
-                var button = new Button();
-                button.Text = $"ПК {computer.Number}";
-                button.Size = new Size(buttonWidth, buttonHeight);
-                button.Location = new Point(startOffset + column * (buttonWidth + spacing), startOffset + row * (buttonHeight + spacing));
-                button.BackColor = isAvailableNow ? Color.LightGreen : Color.LightCoral;
-                button.UseVisualStyleBackColor = false;
-                button.Tag = computer.Number;
-                button.Click += OnComputerButtonClick;
-                _computerMap.Controls.Add(button);
-            }
-
-            _computerMap.ResumeLayout();
-        }
-
-        private void OnComputerButtonClick(object? sender, EventArgs e)
-        {
-            if (sender is Button button && button.Tag is int number)
-                _cmbComputers.SelectedValue = number;
-        }
-
-        private void OnStartDirectClick(object? sender, EventArgs e)
-        {
-            if (_sessionManager is null)
-            {
-                ShowResult(false, "Форма открыта в режиме конструктора. Запустите приложение для открытия сеанса.");
-                return;
-            }
-
-            if (!SelectedClientId.HasValue || !SelectedComputerNumber.HasValue)
-            {
-                MessageBox.Show("Выберите клиента и компьютер", "Сеанс", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var session = _sessionManager.StartSessionDirect(
-                SelectedClientId.Value,
-                SelectedComputerNumber.Value,
-                DateTime.Now,
-                TimeSpan.FromMinutes((double)_numDurationMinutes.Value));
-
-            var success = session is not null;
-            ShowResult(success, _sessionManager.LastMessage);
-            if (success)
-                RefreshAll();
-        }
-
-        private void OnCreateBookingClick(object? sender, EventArgs e)
-        {
-            if (_sessionManager is null)
-            {
-                ShowResult(false, "Форма открыта в режиме конструктора. Запустите приложение для создания брони.");
-                return;
-            }
-
-            if (!SelectedClientId.HasValue)
-            {
-                MessageBox.Show("Выберите клиента перед созданием брони", "Бронь", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            using var dialog = new BookingDialog(_sessionManager, SelectedClientId.Value, SelectedComputerNumber);
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var success = _sessionManager.CreateBooking(SelectedClientId.Value, dialog.SelectedComputerNumber, dialog.SelectedStart, dialog.SelectedDuration);
-            ShowResult(success, _sessionManager.LastMessage);
-            if (success)
-                RefreshAll();
-        }
-
-        private void OnStartBookingClick(object? sender, EventArgs e)
-        {
-            if (_sessionManager is null)
-            {
-                ShowResult(false, "Форма открыта в режиме конструктора. Запустите приложение для старта по брони.");
-                return;
-            }
-
-            var row = GetSelectedBookingRow();
-            if (row is null)
-            {
-                MessageBox.Show("Выберите бронь", "Бронь", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var session = _sessionManager.StartSession(row.Id);
-            var success = session is not null;
-            ShowResult(success, _sessionManager.LastMessage);
-            if (success)
-                RefreshAll();
-        }
-
-        private void OnCancelBookingClick(object? sender, EventArgs e)
-        {
-            if (_sessionManager is null)
-            {
-                ShowResult(false, "Форма открыта в режиме конструктора. Запустите приложение для отмены брони.");
-                return;
-            }
-
-            var row = GetSelectedBookingRow();
-            if (row is null)
-            {
-                MessageBox.Show("Выберите бронь", "Бронь", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var confirm = MessageBox.Show("Удалить выбранную бронь?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
-
-            var success = _sessionManager.CancelBooking(row.Id);
-            ShowResult(success, _sessionManager.LastMessage);
-            if (success)
-                RefreshAll();
-        }
-
-        private void OnExtendSessionClick(object? sender, EventArgs e)
-        {
-            if (_sessionManager is null)
-            {
-                ShowResult(false, "Форма открыта в режиме конструктора. Запустите приложение для продления сеанса.");
-                return;
-            }
-
-            var row = GetSelectedActiveSessionRow();
-            if (row is null)
-            {
-                MessageBox.Show("Выберите активный сеанс", "Сеанс", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            using var dialog = new ExtendSessionDialog();
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var success = _sessionManager.ExtendSession(row.Id, TimeSpan.FromMinutes(dialog.AdditionalMinutes));
-            ShowResult(success, _sessionManager.LastMessage);
-            if (success)
-                RefreshAll();
-        }
-
-        private void OnFinishSessionClick(object? sender, EventArgs e)
-        {
-            if (_sessionManager is null)
-            {
-                ShowResult(false, "Форма открыта в режиме конструктора. Запустите приложение для завершения сеанса.");
-                return;
-            }
-
-            var row = GetSelectedActiveSessionRow();
-            if (row is null)
-            {
-                MessageBox.Show("Выберите активный сеанс", "Сеанс", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var preview = _sessionManager.PreviewCompletion(row.Id);
-            if (preview is null)
-            {
-                ShowResult(false, _sessionManager.LastMessage);
-                return;
-            }
-
-            using var receipt = new ReceiptDialog(preview, confirmMode: true);
-            if (receipt.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var completedSession = _sessionManager.CompleteSession(row.Id);
-            if (completedSession is not null)
-            {
-                using var finalReceipt = new ReceiptDialog(completedSession, confirmMode: false);
-                finalReceipt.ShowDialog(this);
-            }
-            else
-            {
-                ShowResult(false, _sessionManager.LastMessage);
-            }
-
-            RefreshAll();
-        }
-
-        private ActiveSessionRow? GetSelectedActiveSessionRow()
-        {
-            if (_gridActiveSessions.CurrentRow?.DataBoundItem is ActiveSessionRow row)
-                return row;
-
-            if (_gridActiveSessions.CurrentRow is not null && _gridActiveSessions.CurrentRow.Cells[0].Value is not null)
-            {
-                return new ActiveSessionRow
-                {
-                    Id = Convert.ToInt32(_gridActiveSessions.CurrentRow.Cells[0].Value)
-                };
-            }
-
             return null;
         }
+        var id = Convert.ToInt32(gridClients.CurrentRow.Cells["Id"].Value);
+        return _clientManager.GetClientById(id);
+    }
 
-        private BookingRow? GetSelectedBookingRow()
+    private int? GetSelectedSessionId()
+    {
+        if (gridSessions.CurrentRow == null || gridSessions.CurrentRow.Cells["Id"].Value == null)
         {
-            if (_gridBookings.CurrentRow?.DataBoundItem is BookingRow row)
-                return row;
-
-            if (_gridBookings.CurrentRow is not null && _gridBookings.CurrentRow.Cells[0].Value is not null)
-            {
-                return new BookingRow
-                {
-                    Id = Convert.ToInt32(_gridBookings.CurrentRow.Cells[0].Value)
-                };
-            }
-
             return null;
         }
+        return Convert.ToInt32(gridSessions.CurrentRow.Cells["Id"].Value);
+    }
 
-        private int? SelectedClientId
+    private int? GetSelectedBookingId()
+    {
+        if (gridBookings.CurrentRow == null || gridBookings.CurrentRow.Cells["Id"].Value == null)
         {
-            get
-            {
-                if (_cmbClients.SelectedValue is int id)
-                    return id;
-                if (int.TryParse(_cmbClients.SelectedValue?.ToString(), out var parsed))
-                    return parsed;
-                return null;
-            }
+            return null;
         }
+        return Convert.ToInt32(gridBookings.CurrentRow.Cells["Id"].Value);
+    }
 
-        private int? SelectedComputerNumber
-        {
-            get
-            {
-                if (_cmbComputers.SelectedValue is int number)
-                    return number;
-                if (int.TryParse(_cmbComputers.SelectedValue?.ToString(), out var parsed))
-                    return parsed;
-                return null;
-            }
-        }
+    private void ShowMessage(string message, bool success)
+    {
+        lblMessage.ForeColor = success ? Color.DarkGreen : Color.DarkRed;
+        lblMessage.Text = message;
+    }
 
-        private static string FormatTimeSpan(TimeSpan value)
-        {
-            var negative = value.TotalSeconds < 0;
-            if (negative)
-                value = value.Negate();
-            return $"{(negative ? "-" : string.Empty)}{(int)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}";
-        }
-
-        private static void ShowResult(bool success, string message)
-        {
-            MessageBox.Show(message, success ? "Готово" : "Ошибка", MessageBoxButtons.OK, success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
-        }
-
-        private void ActiveSessionsCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
-        {
-            if (e.RowIndex < 0)
-                return;
-
-            var row = _gridActiveSessions.Rows[e.RowIndex].DataBoundItem as ActiveSessionRow;
-            var isExpired = row?.IsExpired == true;
-
-            if (row is null && _gridActiveSessions.Rows[e.RowIndex].Cells[6].Value is bool cellValue)
-                isExpired = cellValue;
-
-            if (isExpired)
-                _gridActiveSessions.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.MistyRose;
-            else
-                _gridActiveSessions.Rows[e.RowIndex].DefaultCellStyle.BackColor = _gridActiveSessions.DefaultCellStyle.BackColor;
-        }
-
-        private class ActiveSessionRow
-        {
-            public int Id { get; set; }
-            public string Client { get; set; } = string.Empty;
-            public int Computer { get; set; }
-            public string StartTime { get; set; } = string.Empty;
-            public string PlannedEndTime { get; set; } = string.Empty;
-            public string Remaining { get; set; } = string.Empty;
-            public bool IsExpired { get; set; }
-        }
-
-        private class BookingRow
-        {
-            public int Id { get; set; }
-            public string Client { get; set; } = string.Empty;
-            public int Computer { get; set; }
-            public string Start { get; set; } = string.Empty;
-            public string End { get; set; } = string.Empty;
-            public int DurationMinutes { get; set; }
-        }
+    private static string FormatTime(TimeSpan value)
+    {
+        return value.TotalHours >= 1 ? $"{(int)value.TotalHours:00}:{value.Minutes:00}" : $"00:{value.Minutes:00}";
     }
 }

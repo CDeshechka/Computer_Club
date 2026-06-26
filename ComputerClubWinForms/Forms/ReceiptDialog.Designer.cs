@@ -1,71 +1,63 @@
-#nullable enable
-
-namespace ComputerClubWinForms.Forms;
-
-partial class ReceiptDialog
+namespace ComputerClubWinForms.Forms
 {
-    private System.ComponentModel.IContainer? components = null;
-    private TextBox _textBox = null!;
-    private Button _btnOk = null!;
-    private Button _btnCancel = null!;
-
-    protected override void Dispose(bool disposing)
+    partial class ReceiptDialog
     {
-        if (disposing && (components != null))
-            components.Dispose();
-        base.Dispose(disposing);
-    }
+        private System.ComponentModel.IContainer? components = null;
+        private System.Windows.Forms.TextBox txtReceipt = null!;
+        private System.Windows.Forms.Button btnConfirm = null!;
+        private System.Windows.Forms.Button btnCancel = null!;
 
-    private void InitializeComponent()
-    {
-        components = new System.ComponentModel.Container();
-        _textBox = new TextBox();
-        _btnOk = new Button();
-        _btnCancel = new Button();
-        SuspendLayout();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && components != null)
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
 
-        _textBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        _textBox.Font = new Font("Consolas", 10F, FontStyle.Regular, GraphicsUnit.Point);
-        _textBox.Location = new Point(16, 16);
-        _textBox.Multiline = true;
-        _textBox.Name = "_textBox";
-        _textBox.ReadOnly = true;
-        _textBox.ScrollBars = ScrollBars.Vertical;
-        _textBox.Size = new Size(528, 382);
-        _textBox.TabIndex = 0;
-
-        _btnOk.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        _btnOk.DialogResult = DialogResult.OK;
-        _btnOk.Location = new Point(314, 418);
-        _btnOk.Name = "_btnOk";
-        _btnOk.Size = new Size(150, 27);
-        _btnOk.TabIndex = 1;
-        _btnOk.Text = "ОК";
-        _btnOk.UseVisualStyleBackColor = true;
-
-        _btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        _btnCancel.DialogResult = DialogResult.Cancel;
-        _btnCancel.Location = new Point(470, 418);
-        _btnCancel.Name = "_btnCancel";
-        _btnCancel.Size = new Size(74, 27);
-        _btnCancel.TabIndex = 2;
-        _btnCancel.Text = "Отмена";
-        _btnCancel.UseVisualStyleBackColor = true;
-        _btnCancel.Visible = false;
-
-        AcceptButton = _btnOk;
-        AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
-        CancelButton = _btnOk;
-        ClientSize = new Size(560, 460);
-        Controls.AddRange(new Control[] { _textBox, _btnOk, _btnCancel });
-        MaximizeBox = false;
-        MinimizeBox = false;
-        MinimumSize = new Size(576, 499);
-        Name = "ReceiptDialog";
-        StartPosition = FormStartPosition.CenterParent;
-        Text = "Чек закрытого сеанса";
-        ResumeLayout(false);
-        PerformLayout();
+        private void InitializeComponent()
+        {
+            this.txtReceipt = new System.Windows.Forms.TextBox();
+            this.btnConfirm = new System.Windows.Forms.Button();
+            this.btnCancel = new System.Windows.Forms.Button();
+            this.SuspendLayout();
+            this.txtReceipt.Location = new System.Drawing.Point(20, 20);
+            this.txtReceipt.Multiline = true;
+            this.txtReceipt.Name = "txtReceipt";
+            this.txtReceipt.ReadOnly = true;
+            this.txtReceipt.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtReceipt.Size = new System.Drawing.Size(390, 260);
+            this.txtReceipt.TabIndex = 0;
+            this.txtReceipt.Text = "Здесь будет отображаться чек завершения сеанса.";
+            this.btnConfirm.Location = new System.Drawing.Point(180, 300);
+            this.btnConfirm.Name = "btnConfirm";
+            this.btnConfirm.Size = new System.Drawing.Size(110, 34);
+            this.btnConfirm.TabIndex = 1;
+            this.btnConfirm.Text = "Подтвердить";
+            this.btnConfirm.UseVisualStyleBackColor = true;
+            this.btnConfirm.Click += new System.EventHandler(this.OnConfirmClick);
+            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnCancel.Location = new System.Drawing.Point(300, 300);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(110, 34);
+            this.btnCancel.TabIndex = 2;
+            this.btnCancel.Text = "Отмена";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            this.AcceptButton = this.btnConfirm;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.CancelButton = this.btnCancel;
+            this.ClientSize = new System.Drawing.Size(430, 360);
+            this.Controls.Add(this.txtReceipt);
+            this.Controls.Add(this.btnConfirm);
+            this.Controls.Add(this.btnCancel);
+            this.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.Name = "ReceiptDialog";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "Завершение сеанса";
+            this.ResumeLayout(false);
+            this.PerformLayout();
+        }
     }
 }

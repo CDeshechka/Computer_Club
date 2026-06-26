@@ -1,5 +1,4 @@
-using System.ComponentModel;
-using System.Globalization;
+using ComputerClubWinForms.Data;
 using ComputerClubWinForms.Managers;
 
 namespace ComputerClubWinForms.Forms;
@@ -7,49 +6,76 @@ namespace ComputerClubWinForms.Forms;
 public partial class SettingsPage : UserControl
 {
     private TariffManager? _tariffManager;
+    private DatabaseHelper? _db;
 
     public SettingsPage()
     {
         InitializeComponent();
-
-        if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
-            ShowCurrentTariff(150m);
     }
 
-    public SettingsPage(TariffManager tariffManager) : this()
+    public SettingsPage(TariffManager tariffManager, DatabaseHelper db) : this()
     {
         _tariffManager = tariffManager;
+        _db = db;
         ShowCurrentTariff(_tariffManager.GetCurrentTariff());
-    }
-
-    private void OnSaveTariffClick(object? sender, EventArgs e)
-    {
-        if (_tariffManager is null)
-            return;
-
-        if (!decimal.TryParse(_txtTariff.Text.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var tariff) || tariff <= 0m)
-        {
-            ShowMessage(false, "Цена должна быть положительным числом");
-            return;
-        }
-
-        var success = _tariffManager.UpdateTariff(tariff);
-        ShowMessage(success, _tariffManager.LastMessage);
-        if (success)
-        {
-            ShowCurrentTariff(tariff);
-            _txtTariff.Clear();
-        }
+        txtConnection.Text = _db.ConnectionString;
     }
 
     public void ShowCurrentTariff(decimal tariff)
     {
-        var culture = CultureInfo.GetCultureInfo("ru-RU");
-        _lblCurrentTariff.Text = $"Текущий тариф: {tariff.ToString("N2", culture)} руб./час";
+        lblCurrentTariff.Text = $"Текущий тариф: {tariff:0.00} руб./час";
+        txtTariff.Text = tariff.ToString("0.##");
     }
 
-    public void ShowMessage(bool success, string message)
+    private void OnSaveTariffClick(object? sender, EventArgs e)
     {
-        MessageBox.Show(message, success ? "Готово" : "Ошибка", MessageBoxButtons.OK, success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        if (_tariffManager == null)
+        {
+            ShowMessage(false, "Форма открыта в режиме конструктора.");
+            return;
+        }
+
+        if (!decimal.TryParse(txtTariff.Text, out var tariff))
+        {
+            ShowMessage(false, "Введите число.");
+            return;
+        }
+        var success = _tariffManager.UpdateTariff(tariff);
+        if (success)
+        {
+            ShowCurrentTariff(_tariffManager.GetCurrentTariff());
+        }
+        ShowMessage(success, _tariffManager.LastMessage);
+    }
+
+    private void OnSaveConnectionClick(object? sender, EventArgs e)
+    {
+        if (_db == null)
+        {
+            ShowMessage(false, "Сохранение доступно после запуска приложения.");
+            return;
+        }
+
+        _db.SaveConnectionString(txtConnection.Text);
+        ShowMessage(true, "Строка подключения сохранена. Перезапустите программу для применения настроек.");
+    }
+
+    private void OnTestConnectionClick(object? sender, EventArgs e)
+    {
+        if (_db == null)
+        {
+            ShowMessage(false, "Проверка подключения доступна после запуска приложения.");
+            return;
+        }
+
+        _db.SaveConnectionString(txtConnection.Text);
+        var success = _db.TestConnection(out var message);
+        ShowMessage(success, message);
+    }
+
+    private void ShowMessage(bool success, string message)
+    {
+        lblMessage.ForeColor = success ? Color.DarkGreen : Color.DarkRed;
+        lblMessage.Text = message;
     }
 }

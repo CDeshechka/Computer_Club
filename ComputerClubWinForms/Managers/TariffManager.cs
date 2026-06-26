@@ -1,6 +1,6 @@
-using System.Globalization;
 using ComputerClubWinForms.Data;
 using ComputerClubWinForms.Models;
+using Npgsql;
 
 namespace ComputerClubWinForms.Managers;
 
@@ -8,7 +8,6 @@ public class TariffManager
 {
     private readonly DatabaseHelper _db;
     private readonly ClientManager _clientManager;
-
     public string LastMessage { get; private set; } = string.Empty;
 
     public TariffManager(DatabaseHelper db, ClientManager clientManager)
@@ -20,80 +19,58 @@ public class TariffManager
     public decimal GetCurrentTariff()
     {
         using var connection = _db.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Value FROM Settings WHERE Key = 'TariffPerHour'";
-
-        var value = command.ExecuteScalar()?.ToString();
-        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var tariff))
-            return tariff;
-
-        return 150m;
+        connection.Open();
+        using var command = new NpgsqlCommand("SELECT value FROM settings WHERE key = 'TariffPerHour'", connection);
+        var value = command.ExecuteScalar();
+        if (value == null)
+        {
+            return 150;
+        }
+        return decimal.TryParse(value.ToString(), out var tariff) ? tariff : 150;
     }
 
     public bool UpdateTariff(decimal newTariff)
     {
-        if (newTariff <= 0m)
-            return Fail("Цена должна быть положительным числом");
-
-        try
+        LastMessage = string.Empty;
+        if (newTariff <= 0)
         {
-            using var connection = _db.CreateConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                INSERT INTO Settings(Key, Value) VALUES ('TariffPerHour', $value)
-                ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
-                """;
-            command.Parameters.AddWithValue("$value", newTariff.ToString(CultureInfo.InvariantCulture));
-            command.ExecuteNonQuery();
-
-            return Ok("Тариф сохранён");
+            LastMessage = "Тариф должен быть больше нуля.";
+            return false;
         }
-        catch (Exception ex)
-        {
-            return Fail("Не удалось сохранить тариф: " + ex.Message);
-        }
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var command = new NpgsqlCommand("INSERT INTO settings(key, value) VALUES ('TariffPerHour', @value) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", connection);
+        command.Parameters.AddWithValue("value", newTariff.ToString("0.##"));
+        command.ExecuteNonQuery();
+        LastMessage = "Тариф сохранён.";
+        return true;
     }
 
     public void CalculateSessionCost(Session session)
     {
-        var tariff = GetCurrentTariff();
-        var hours = GetBillableHours(session.Duration);
-        var baseCost = Math.Round((decimal)hours * tariff, 2);
-
-        var oneTimeDiscount = session.Duration.TotalHours > 3 ? 5m : 0m;
-        var personalDiscount = GetPersonalDiscount(_clientManager.GetClientTotalHours(session.ClientId));
-        var totalDiscount = oneTimeDiscount + personalDiscount;
-        var total = Math.Round(baseCost * (1m - totalDiscount / 100m), 2);
-
-        session.TariffPerHour = tariff;
-        session.OneTimeDiscountPercent = oneTimeDiscount;
-        session.PersonalDiscountPercent = personalDiscount;
-        session.TotalCost = total < 0 ? 0 : total;
-    }
-
-
-    public static double GetBillableHours(TimeSpan duration)
-    {
-        return Math.Max(duration.TotalMinutes, 1) / 60d;
+        var hours = Math.Max(1m / 60m, (decimal)session.Duration.TotalMinutes / 60m);
+        session.TariffPerHour = GetCurrentTariff();
+        session.OneTimeDiscountPercent = session.Duration.TotalHours > 3 ? 5 : 0;
+        session.PersonalDiscountPercent = GetPersonalDiscount(_clientManager.GetClientTotalHours(session.ClientId));
+        var baseCost = hours * session.TariffPerHour;
+        var totalDiscount = session.OneTimeDiscountPercent + session.PersonalDiscountPercent;
+        session.TotalCost = Math.Round(baseCost * (1 - totalDiscount / 100), 2);
     }
 
     public int GetPersonalDiscount(double totalHours)
     {
-        if (totalHours < 10) return 0;
-        if (totalHours < 20) return 5;
-        if (totalHours < 30) return 10;
-        return 15;
-    }
-
-    private bool Ok(string message)
-    {
-        LastMessage = message;
-        return true;
-    }
-
-    private bool Fail(string message)
-    {
-        LastMessage = message;
-        return false;
+        if (totalHours >= 100)
+        {
+            return 15;
+        }
+        if (totalHours >= 50)
+        {
+            return 10;
+        }
+        if (totalHours >= 20)
+        {
+            return 5;
+        }
+        return 0;
     }
 }

@@ -1,5 +1,6 @@
 using ComputerClubWinForms.Data;
 using ComputerClubWinForms.Models;
+using Npgsql;
 
 namespace ComputerClubWinForms.Managers;
 
@@ -7,7 +8,6 @@ public class UserManager
 {
     private readonly DatabaseHelper _db;
     private User? _currentUser;
-
     public string LastMessage { get; private set; } = string.Empty;
 
     public UserManager(DatabaseHelper db)
@@ -17,39 +17,32 @@ public class UserManager
 
     public User? Login(string username, string password)
     {
+        LastMessage = string.Empty;
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-            return Fail("Введите логин и пароль");
-
-        try
         {
-            using var connection = _db.CreateConnection();
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT Id, Username, Password, Role FROM Users WHERE Username = $username LIMIT 1";
-            command.Parameters.AddWithValue("$username", username.Trim());
-
-            using var reader = command.ExecuteReader();
-            if (!reader.Read())
-                return Fail("Неверное имя пользователя или пароль");
-
-            var user = new User
-            {
-                Id = reader.GetInt32(0),
-                Username = reader.GetString(1),
-                Password = reader.GetString(2),
-                Role = reader.GetString(3)
-            };
-
-            if (password != user.Password)
-                return Fail("Неверное имя пользователя или пароль");
-
-            _currentUser = user;
-            LastMessage = "Вход выполнен";
-            return user;
+            LastMessage = "Введите логин и пароль.";
+            return null;
         }
-        catch (Exception ex)
+        using var connection = _db.CreateConnection();
+        connection.Open();
+        using var command = new NpgsqlCommand("SELECT id, username, password, role FROM users WHERE username = @username AND password = @password", connection);
+        command.Parameters.AddWithValue("username", username.Trim());
+        command.Parameters.AddWithValue("password", password.Trim());
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
         {
-            return Fail($"Ошибка подключения к базе данных: {ex.Message}");
+            LastMessage = "Неверный логин или пароль.";
+            return null;
         }
+        _currentUser = new User
+        {
+            Id = reader.GetInt32(0),
+            Username = reader.GetString(1),
+            Password = reader.GetString(2),
+            Role = reader.GetString(3)
+        };
+        LastMessage = "Вход выполнен.";
+        return _currentUser;
     }
 
     public User? GetCurrentUser()
@@ -60,12 +53,6 @@ public class UserManager
     public void Logout()
     {
         _currentUser = null;
-        LastMessage = "Выход выполнен";
-    }
-
-    private User? Fail(string message)
-    {
-        LastMessage = message;
-        return null;
+        LastMessage = "Пользователь вышел из системы.";
     }
 }
